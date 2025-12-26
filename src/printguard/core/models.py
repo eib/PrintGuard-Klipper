@@ -12,6 +12,8 @@ class FeedSettings(BaseModel):
     brightness: float = 1.0
     contrast: float = 1.0
     sensitivity: float = 1.0
+    majority_voting: int = 1
+    target_fps: float = 1000.0
 
 
 class RTCOffer(BaseModel):
@@ -86,6 +88,7 @@ class PredictionResult(BaseModel):
     confidence: Optional[float] = None
     distances: Optional[dict[str, float]] = None
     status: PredictionStatus = PredictionStatus.SUCCESS
+    actual_fps: Optional[float] = None
 
 
 class CFAccount(BaseModel):
@@ -202,6 +205,9 @@ class PrinterConfig(BaseModel):
     components: PrinterComponents
     linked_session_id: Optional[str] = None
     client_public_key: Optional[str] = None
+    inference_sensitivity: float = 1.0
+    inference_majority_voting: int = 1
+    inference_target_fps: float = 1000.0
 
 
 class PrinterInfo(BaseModel):
@@ -213,6 +219,9 @@ class PrinterInfo(BaseModel):
     has_control: bool = False
     has_camera: bool = False
     components: Optional[dict[str, ComponentInfo]] = None
+    inference_sensitivity: float = 1.0
+    inference_majority_voting: int = 1
+    inference_target_fps: float = 1000.0
 
 
 class ConnectionInfo(BaseModel):
@@ -255,3 +264,6 @@ class PrinterUpdate(BaseModel):
     """Request to update a printer."""
     name: Optional[str] = None
     components: Optional[PrinterComponents] = None
+    inference_sensitivity: Optional[float] = None
+    inference_majority_voting: Optional[int] = None
+    inference_target_fps: Optional[float] = None

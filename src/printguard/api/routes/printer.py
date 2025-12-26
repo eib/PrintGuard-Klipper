@@ -84,7 +84,10 @@ async def _get_or_create_printer_instance(printer_id: str, db: AsyncSession) -> 
         id=db_printer.id,
         name=db_printer.name,
         components={role: ComponentConfig(id=c.id, provider=c.provider, config=c.config) for role, c in comp_map.items()},
-        client_public_key=db_printer.client_public_key
+        client_public_key=db_printer.client_public_key,
+        inference_sensitivity=db_printer.inference_sensitivity,
+        inference_majority_voting=db_printer.inference_majority_voting,
+        inference_target_fps=db_printer.inference_target_fps
     )
     instance = PrinterInstance(config=config)
     for role, db_comp in comp_map.items():
@@ -120,7 +123,10 @@ async def register_printer(
     """Register a new modular printer."""
     db_printer = Printer(
         name=config.name,
-        client_public_key=config.client_public_key
+        client_public_key=config.client_public_key,
+        inference_sensitivity=config.inference_sensitivity,
+        inference_majority_voting=config.inference_majority_voting,
+        inference_target_fps=config.inference_target_fps
     )
     if config.id:
         db_printer.id = config.id
@@ -181,6 +187,13 @@ async def update_printer(
     
     if config.name is not None:
         db_printer.name = config.name
+    
+    if config.inference_sensitivity is not None:
+        db_printer.inference_sensitivity = config.inference_sensitivity
+    if config.inference_majority_voting is not None:
+        db_printer.inference_majority_voting = config.inference_majority_voting
+    if config.inference_target_fps is not None:
+        db_printer.inference_target_fps = config.inference_target_fps
         
     if config.components is not None:
         for link in db_printer.component_links:
@@ -205,6 +218,15 @@ async def update_printer(
     await db.commit()
     if printer_id in _printers:
         _printers.pop(printer_id)
+
+    source = stream_manager.get_source(printer_id)
+    if source:
+        logger.info(f"Updating active stream for printer {printer_id} with target_fps {db_printer.inference_target_fps}")
+        source.settings.sensitivity = db_printer.inference_sensitivity
+        source.settings.majority_voting = db_printer.inference_majority_voting
+        source.settings.target_fps = db_printer.inference_target_fps
+        source.processor.settings = source.settings
+
     return await get_printer(printer_id, db, _)
 
 
@@ -261,7 +283,10 @@ async def get_printer(
         linked_session_id=instance.config.linked_session_id,
         has_control=instance.control is not None,
         has_camera=instance.camera is not None,
-        components=components_info
+        components=components_info,
+        inference_sensitivity=instance.config.inference_sensitivity,
+        inference_majority_voting=instance.config.inference_majority_voting,
+        inference_target_fps=instance.config.inference_target_fps
     )
 
 
@@ -274,24 +299,39 @@ async def link_printer_stream(
     _: any = Security(get_current_identity, scopes=["printer:write", "rtc:stream"])
 ) -> dict:
     """Ensure printer camera is multiplexed and active."""
-    if settings is None:
-        settings = FeedSettings()
-        
     instance = await _get_or_create_printer_instance(printer_id, db)
     if not instance:
         raise HTTPException(status_code=404, detail="Printer not found")
+
+    if settings is None:
+        settings = FeedSettings(
+            sensitivity=instance.config.inference_sensitivity,
+            majority_voting=instance.config.inference_majority_voting,
+            target_fps=instance.config.inference_target_fps
+        )
+    
     if not instance.camera:
         raise HTTPException(status_code=400, detail="Printer has no camera source")
-    if stream_manager.get_source(printer_id):
+    
+    source = stream_manager.get_source(printer_id)
+    if source:
+        logger.info(f"Syncing settings for existing stream {printer_id}: sensitivity={instance.config.inference_sensitivity}, target_fps={instance.config.inference_target_fps}")
+        source.settings.sensitivity = instance.config.inference_sensitivity
+        source.settings.majority_voting = instance.config.inference_majority_voting
+        source.settings.target_fps = instance.config.inference_target_fps
+        source.processor.settings = source.settings
+            
         stream_manager.add_alias(printer_id, session_id)
         return {"status": "success", "session_id": session_id, "multiplexed": True}
+    
     track, pc = await instance.camera.get_camera_track()
     if not track:
         raise HTTPException(status_code=404, detail="Camera track not available")
+    
     model_info = get_model()
     processor = await start_track_processing(track, predict, model_info, settings, session_id)
     if processor.relayed_track:
-        stream_manager.register_source(
+        await stream_manager.register_source(
             printer_id, 
             processor.relayed_track, 
             processor,
@@ -300,6 +340,7 @@ async def link_printer_stream(
             settings=settings
         )
         stream_manager.add_alias(printer_id, session_id)
+    
     instance.config.linked_session_id = session_id
     return {"status": "success", "session_id": session_id}
 

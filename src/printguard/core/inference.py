@@ -1,11 +1,14 @@
 """Inference functions."""
 
+import logging
 from io import BytesIO
 from typing import Union
 
 import numpy as np
 from PIL import Image
 from torchvision import transforms
+
+logger = logging.getLogger(__name__)
 
 
 def get_transform():
@@ -39,22 +42,49 @@ def predict(image: Union[bytes, Image.Image], model_info: dict, sensitivity: flo
         {model_info["input_name"]: image_array}
     )
     embedding = outputs[0].flatten()
+    
     # Compute distances to prototypes
     prototypes = model_info["prototypes"]
+    class_names = model_info["class_names"]
+    defect_idx = model_info["defect_idx"]
     distances = np.linalg.norm(prototypes - embedding, axis=1)
+    
     # Apply sensitivity adjustment
     adjusted_distances = distances.copy()
-    defect_idx = model_info["defect_idx"]
-    if defect_idx >= 0 and sensitivity != 1.0:
-        adjusted_distances[defect_idx] *= (1.0 / sensitivity)
-    # Get prediction
-    predicted_idx = int(np.argmin(adjusted_distances))
-    class_names = model_info["class_names"]
-    min_dist = adjusted_distances[predicted_idx]
-    confidence = 1.0 / (1.0 + min_dist)
+    safe_sensitivity = max(0.001, sensitivity)
+    
+    if defect_idx >= 0 and safe_sensitivity != 1.0:
+        adjustment = 1.0 / safe_sensitivity
+        adjusted_distances[defect_idx] *= adjustment
+    
+    # Calculate Softmax Probabilities from adjusted distances
+    temperature = 0.1 
+    scores = -adjusted_distances / temperature
+    exp_scores = np.exp(scores - np.max(scores)) 
+    probabilities = exp_scores / exp_scores.sum()
+    
+    # Get the winning class
+    predicted_idx = int(np.argmax(probabilities))
+    confidence = float(probabilities[predicted_idx])
+    
+    # Standardize the class name if it's the defect index
+    class_name = class_names[predicted_idx]
+    if defect_idx >= 0 and predicted_idx == defect_idx:
+        class_name = "defect"
+    
+    if safe_sensitivity != 1.0:
+        orig_defect_dist = distances[defect_idx] if defect_idx >= 0 else 0
+        adj_defect_dist = adjusted_distances[defect_idx] if defect_idx >= 0 else 0
+        logger.debug(
+            f"Sensitivity {safe_sensitivity} | "
+            f"Winner: {class_name} ({confidence*100:.1f}%) | "
+            f"Defect Dist: {orig_defect_dist:.4f} -> {adj_defect_dist:.4f}"
+        )
+    
     return {
-        "class_name": class_names[predicted_idx],
+        "class_name": class_name,
         "class_idx": predicted_idx,
-        "confidence": float(confidence),
+        "confidence": confidence,
         "distances": {name: float(d) for name, d in zip(class_names, distances)},
+        "probabilities": {name: float(p) for name, p in zip(class_names, probabilities)},
     }

@@ -1,11 +1,23 @@
 import { ref, onUnmounted } from 'vue'
 import { streamsApi } from '../services/api'
+import type { PredictionResult } from '../types'
 
 export function useWebRTC() {
   const videoRef = ref<HTMLVideoElement | null>(null)
   const connected = ref(false)
   const error = ref<string | null>(null)
   const pc = ref<RTCPeerConnection | null>(null)
+  const latestResult = ref<PredictionResult | null>(null)
+
+  function setupDataChannel(channel: RTCDataChannel) {
+    channel.onmessage = (event) => {
+      try {
+        latestResult.value = JSON.parse(event.data)
+      } catch (e) {
+        console.error('Failed to parse WebRTC message:', e)
+      }
+    }
+  }
 
   async function connect(sessionId: string) {
     if (pc.value) {
@@ -40,6 +52,10 @@ export function useWebRTC() {
         } else if (pc.value?.connectionState === 'failed') {
           error.value = 'WebRTC connection failed'
         }
+      }
+
+      pc.value.ondatachannel = (event) => {
+        setupDataChannel(event.channel)
       }
 
       pc.value.addTransceiver('video', { direction: 'recvonly' })
@@ -103,6 +119,9 @@ export function useWebRTC() {
         pc.value?.addTrack(track, stream)
       })
 
+      const dc = pc.value.createDataChannel('results')
+      setupDataChannel(dc)
+
       pc.value.onconnectionstatechange = () => {
         if (pc.value?.connectionState === 'connected') {
           connected.value = true
@@ -147,6 +166,7 @@ export function useWebRTC() {
     videoRef,
     connected,
     error,
+    latestResult,
     connect,
     push,
     disconnect

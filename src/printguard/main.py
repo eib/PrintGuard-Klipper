@@ -1,6 +1,7 @@
 """FastAPI application entry point."""
 
 import asyncio
+import logging
 
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
@@ -16,10 +17,20 @@ from .api.routes import router
 from .services.webrtc import cleanup
 from .services.tunnels import setup_active_tunnel
 
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(levelname)s:     %(message)s',
+)
+logging.getLogger("printguard").setLevel(logging.INFO)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Download model on startup if needed, then load it, sets up tunnel based on configuration and cleans up on shutdown."""
+    logger = logging.getLogger("printguard")
+    logger.info("Starting PrintGuard service...")
+    
     settings = get_settings()
     # Initialize database
     await init_db()

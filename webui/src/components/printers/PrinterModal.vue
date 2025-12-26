@@ -32,7 +32,10 @@ const formData = ref<PrinterCreate>({
     camera: '',
     status: null,
     control: null
-  }
+  },
+  inference_sensitivity: 1.0,
+  inference_majority_voting: 1,
+  inference_target_fps: 2.0
 })
 
 watch([() => props.show, () => props.printer], ([show, printer]) => {
@@ -47,7 +50,10 @@ watch([() => props.show, () => props.printer], ([show, printer]) => {
           camera: comps.camera?.id || '',
           status: comps.status?.id || null,
           control: comps.control?.id || null
-        }
+        },
+        inference_sensitivity: printer.inference_sensitivity ?? 1.0,
+        inference_majority_voting: printer.inference_majority_voting ?? 1,
+        inference_target_fps: printer.inference_target_fps ?? 2.0
       }
     } else {
       formData.value = {
@@ -56,7 +62,10 @@ watch([() => props.show, () => props.printer], ([show, printer]) => {
           camera: '',
           status: null,
           control: null
-        }
+        },
+        inference_sensitivity: 1.0,
+        inference_majority_voting: 1,
+        inference_target_fps: 2.0
       }
     }
   }
@@ -146,6 +155,45 @@ async function handleSave() {
         />
       </div>
 
+      <div class="form-section-title">Inference Settings</div>
+      
+      <div class="form-row">
+        <div class="form-field">
+          <label for="sensitivity">Sensitivity</label>
+          <Input
+            id="sensitivity"
+            type="number"
+            step="0.1"
+            v-model.number="formData.inference_sensitivity"
+            placeholder="1.0"
+          />
+          <small class="field-help">Higher = more likely to detect defects (defaults to 1.0)</small>
+        </div>
+
+        <div class="form-field">
+          <label for="majority_voting">Majority Voting</label>
+          <Input
+            id="majority_voting"
+            type="number"
+            v-model.number="formData.inference_majority_voting"
+            placeholder="1"
+          />
+          <small class="field-help">Number of inferences to average</small>
+        </div>
+      </div>
+
+      <div class="form-field">
+        <label for="target_fps">Target Detections Per Second</label>
+        <Input
+          id="target_fps"
+          type="number"
+          step="0.1"
+          v-model.number="formData.inference_target_fps"
+          placeholder="5.0"
+        />
+        <small class="field-help">Limit the number of inferences per second</small>
+      </div>
+
       <div v-if="error" class="form-error">{{ error }}</div>
     </form>
 
@@ -170,4 +218,25 @@ async function handleSave() {
 </template>
 
 <style module>
+.form-section-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin: 1.5rem 0 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-secondary);
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.field-help {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-top: 0.25rem;
+}
 </style>

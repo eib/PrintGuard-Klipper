@@ -45,6 +45,9 @@ export interface Printer {
   has_control: boolean
   has_camera: boolean
   components?: Record<string, ComponentInfo>
+  inference_sensitivity: number
+  inference_majority_voting: number
+  inference_target_fps: number
 }
 
 export interface PrinterCreate {
@@ -54,6 +57,9 @@ export interface PrinterCreate {
     status?: string | null
     control?: string | null
   }
+  inference_sensitivity?: number
+  inference_majority_voting?: number
+  inference_target_fps?: number
 }
 
 export type PrinterUpdate = Partial<PrinterCreate>
@@ -63,10 +69,13 @@ export interface HealthStatus {
   error?: string
 }
 
-export interface Entity {
-  id: string
-  name: string
-  type: string
+export interface PredictionResult {
+  class_name?: string
+  class_idx?: number
+  confidence?: number
+  distances?: Record<string, number>
+  status: 'success' | 'waiting' | 'error'
+  actual_fps?: number
 }
 
 export interface ProviderField {

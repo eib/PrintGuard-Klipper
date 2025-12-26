@@ -31,7 +31,7 @@ class StreamManager:
     def __init__(self):
         self._sources: Dict[str, SourceStream] = {}
 
-    def register_source(
+    async def register_source(
         self, 
         source_id: str, 
         track: MediaStreamTrack, 
@@ -43,6 +43,7 @@ class StreamManager:
         """Register a new media source."""
         if source_id in self._sources:
             logger.warning(f"Source {source_id} already registered, overwriting.")
+            await self.close_source(source_id)
         
         self._sources[source_id] = SourceStream(
             source_id, track, processor, pc, device_name, settings

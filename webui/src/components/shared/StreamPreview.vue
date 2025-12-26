@@ -6,7 +6,7 @@ const props = defineProps<{
   sessionId?: string
 }>()
 
-const { videoRef, connected, error, connect, disconnect } = useWebRTC()
+const { videoRef, connected, error, latestResult, connect, disconnect } = useWebRTC()
 
 watch(() => props.sessionId, (newId) => {
   if (newId) {
@@ -42,6 +42,10 @@ onMounted(() => {
     <div v-else-if="!connected" :class="$style.loading">
       <div :class="$style.spinner"></div>
       Connecting to stream...
+    </div>
+
+    <div v-if="connected && latestResult?.actual_fps" :class="$style.fps">
+      {{ latestResult.actual_fps.toFixed(1) }} FPS
     </div>
   </div>
 </template>
@@ -96,6 +100,20 @@ onMounted(() => {
   border-top-color: #3b82f6;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
+}
+
+.fps {
+  position: absolute;
+  bottom: 0.75rem;
+  right: 0.75rem;
+  background-color: rgba(0, 0, 0, 0.6);
+  color: white;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  font-size: 0.7rem;
+  font-family: monospace;
+  pointer-events: none;
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 </style>
 

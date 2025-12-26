@@ -26,6 +26,12 @@ class Printer(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     name: Mapped[str] = mapped_column(String(100))
     client_public_key: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    
+    # Inference settings
+    inference_sensitivity: Mapped[float] = mapped_column(default=1.0)
+    inference_majority_voting: Mapped[int] = mapped_column(default=1)
+    inference_target_fps: Mapped[float] = mapped_column(default=1000.0)
+    
     component_links: Mapped[list["PrinterComponentLink"]] = relationship(back_populates="printer", cascade="all, delete-orphan")
 
 class Connection(Base):

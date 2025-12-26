@@ -2,6 +2,8 @@
 
 import asyncio
 import logging
+import time
+from collections import deque, Counter
 from typing import Callable, Optional
 
 from aiortc import RTCDataChannel, RTCPeerConnection, RTCSessionDescription
@@ -34,6 +36,9 @@ class VideoProcessor:
         self._frame_ready = asyncio.Event()
         self._running = True
         self._last_notified_class: str | None = None
+        self._results_buffer = deque(maxlen=50)
+        self._inference_times = deque(maxlen=10)
+        self._last_inference_time = 0
     
     def add_data_channel(self, channel: RTCDataChannel):
         """Add a data channel to send results to."""
@@ -74,18 +79,31 @@ class VideoProcessor:
     
     async def _run_inference(self):
         """Process the latest available frame."""
-        logger.info(f"Started inference loop for session {self.session_id}")
+        logger.info(f"Started inference loop for session {self.session_id} with target_fps {self.settings.target_fps}")
+        last_log_time = 0
         while self._running:
+            if 0 < self.settings.target_fps < 100:
+                elapsed = time.time() - self._last_inference_time
+                wait_time = (1.0 / self.settings.target_fps) - elapsed
+                if wait_time > 0.001:
+                    await asyncio.sleep(wait_time)
+
             await self._frame_ready.wait()
             if not self._running:
                 break
+            
             frame = self._latest_frame
             self._frame_ready.clear()
             if frame is None:
                 continue
+
+            self._last_inference_time = time.time()
+            self._inference_times.append(self._last_inference_time)
+            
             self._inference_count = getattr(self, "_inference_count", 0) + 1
             if self._inference_count % 100 == 0:
                 logger.debug(f"Running inference {self._inference_count} for session {self.session_id}")
+            
             image = frame.to_image()
             if self.settings.resolution:
                 image = image.resize(self.settings.resolution)
@@ -93,15 +111,48 @@ class VideoProcessor:
                 image = ImageEnhance.Brightness(image).enhance(self.settings.brightness)
             if self.settings.contrast != 1.0:
                 image = ImageEnhance.Contrast(image).enhance(self.settings.contrast)
-            self.last_result = await asyncio.to_thread(
+            
+            infer_start = time.time()
+            result = await asyncio.to_thread(
                 self.predict_fn, image, self.model_info, self.settings.sensitivity
             )
-            if self.last_result:
-                result_model = PredictionResult(**self.last_result, status=PredictionStatus.SUCCESS)
+            infer_duration = time.time() - infer_start
+            
+            if result:
+                self._results_buffer.append(result.get("class_name"))
+                
+                # Calculate majority class
+                window_size = max(1, self.settings.majority_voting)
+                recent_results = list(self._results_buffer)[-window_size:]
+                if recent_results:
+                    majority_class = Counter(recent_results).most_common(1)[0][0]
+                    result["class_name"] = majority_class
+                
+                # Calculate actual FPS
+                actual_fps = 0.0
+                if len(self._inference_times) > 1:
+                    duration = self._inference_times[-1] - self._inference_times[0]
+                    if duration > 0:
+                        actual_fps = (len(self._inference_times) - 1) / duration
+                
+                if self._last_inference_time - last_log_time > 5:
+                    logger.debug(f"Session {self.session_id} stats: target_fps={self.settings.target_fps}, actual_fps={actual_fps:.2f}, sensitivity={self.settings.sensitivity}, infer_time={infer_duration*1000:.1f}ms")
+                    last_log_time = self._last_inference_time
+                
+                result["actual_fps"] = actual_fps
+                self.last_result = result
+                
+                result_model = PredictionResult(**result, status=PredictionStatus.SUCCESS)
                 message = result_model.model_dump_json()
                 for dc in list(self.data_channels):
                     if dc.readyState == "open":
-                        dc.send(message)
+                        try:
+                            dc.send(message)
+                        except Exception as e:
+                            logger.debug(f"Failed to send result over data channel: {e}")
+                            if "not connected" in str(e).lower() or "closed" in str(e).lower():
+                                self.data_channels.discard(dc)
+                
                 if self.session_id:
                     class_name = result_model.class_name
                     if class_name and class_name != PredictionClass.NORMAL and class_name != self._last_notified_class:

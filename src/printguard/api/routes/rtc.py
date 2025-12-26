@@ -1,10 +1,13 @@
 import logging
 import io
 import asyncio
-from fastapi import APIRouter, HTTPException, Response, Security
+from fastapi import APIRouter, HTTPException, Response, Security, Depends
 from aiortc import RTCSessionDescription
+from sqlalchemy import select
 from ...core.inference import predict
 from ...core.model import get_model
+from ...core.database import get_db, AsyncSession
+from ...core.db_models import Printer
 from ...core.models import (
     RTCOffer, RTCAnswer, FeedSettings, 
     StreamInfo, PredictionResult, PredictionStatus
@@ -83,21 +86,35 @@ async def rtc_view(session_id: str, offer: RTCOffer, _: any = Security(get_curre
     )
 
 @router.post("/offer")
-async def rtc_offer(offer: RTCOffer, _: any = Security(get_current_identity, scopes=["rtc:stream"])) -> RTCAnswer:
+async def rtc_offer(
+    offer: RTCOffer, 
+    db: AsyncSession = Depends(get_db),
+    _: any = Security(get_current_identity, scopes=["rtc:stream"])
+) -> RTCAnswer:
     """Accept WebRTC offer and return answer."""
     model_info = get_model()
+    settings = offer.settings
+    if offer.printer_id:
+        result = await db.execute(select(Printer).where(Printer.id == offer.printer_id))
+        db_printer = result.scalar_one_or_none()
+        if db_printer:
+            logger.info(f"Loading printer {offer.printer_id} settings for browser push: sensitivity={db_printer.inference_sensitivity}")
+            settings.sensitivity = db_printer.inference_sensitivity
+            settings.majority_voting = db_printer.inference_majority_voting
+            settings.target_fps = db_printer.inference_target_fps
+
     sdp = RTCSessionDescription(sdp=offer.sdp, type=offer.type)
     pc, processor = await create_peer_connection(
-        sdp, predict, model_info, offer.settings, offer.session_id
+        sdp, predict, model_info, settings, offer.session_id
     )
     if processor.relayed_track:
-        stream_manager.register_source(
+        await stream_manager.register_source(
             offer.session_id, 
             processor.relayed_track, 
             processor,
             pc=pc,
             device_name=offer.device_name,
-            settings=offer.settings
+            settings=settings
         )
         if offer.printer_id:
             stream_manager.add_alias(offer.session_id, offer.printer_id)

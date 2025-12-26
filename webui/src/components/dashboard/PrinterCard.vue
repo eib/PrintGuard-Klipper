@@ -68,10 +68,14 @@ async function handleDelete() {
           {{ printer.status }}
         </Badge>
       </div>
-      <div v-if="prediction && prediction.status === 'success'" :class="[$style.inference, $style[prediction.class_name]]">
-        <span :class="$style.icon">{{ prediction.class_name === 'defect' ? '⚠️' : '✅' }}</span>
-        <span :class="$style.text">{{ prediction.class_name === 'defect' ? 'DEFECT' : 'NORMAL' }}</span>
-        <span :class="$style.confidence">{{ (prediction.confidence * 100).toFixed(0) }}%</span>
+      <div v-if="prediction && prediction.status === 'success'" :class="$style.inferenceWrapper">
+        <div :class="[$style.inference, $style[prediction.class_name]]">
+          <span :class="$style.icon">{{ prediction.class_name === 'defect' ? '⚠️' : '✅' }}</span>
+          <span :class="$style.text">{{ prediction.class_name }}</span>
+        </div>
+        <div v-if="prediction.actual_fps !== undefined" :class="$style.fpsMetric">
+          {{ prediction.actual_fps.toFixed(1) }} det/s
+        </div>
       </div>
     </div>
 
@@ -175,6 +179,13 @@ async function handleDelete() {
   text-overflow: ellipsis;
 }
 
+.inferenceWrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--space-1);
+}
+
 .inference {
   display: flex;
   align-items: center;
@@ -186,6 +197,13 @@ async function handleDelete() {
   letter-spacing: var(--letter-spacing-wide);
   text-transform: uppercase;
   flex-shrink: 0;
+}
+
+.fpsMetric {
+  font-size: 0.65rem;
+  color: var(--text-tertiary);
+  font-family: monospace;
+  font-weight: 600;
 }
 
 .inference.normal {
