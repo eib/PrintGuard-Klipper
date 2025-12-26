@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     debug: bool = False
     host: str = "0.0.0.0"
     port: int = 8000
+    webui_port: int = 5173
 
     # Tunnel Settings
     tunnel_provider: TunnelProvider = TunnelProvider.LOCAL
@@ -38,6 +39,9 @@ class Settings(BaseSettings):
     cloudflare_domain: str = ""
     cloudflare_tunnel_name: str = "printguard-tunnel"
     cloudflare_subdomain: str = "camera"
+    cloudflare_tunnel_id: str = ""
+    cloudflare_tunnel_secret: str = ""
+    cloudflare_account_id: str = ""
 
     # ngrok Settings
     ngrok_authtoken: str = ""
@@ -46,6 +50,14 @@ class Settings(BaseSettings):
 
     # Model Settings
     model_dir: Path = Path(__file__).parent / "model"
+
+    # Security Settings
+    jwt_secret_key: str = "changeme-in-production-use-a-secure-key"
+    jwt_algorithm: str = "HS256"
+    access_token_expire_minutes: int = 60 * 24 * 7
+
+    # Database Settings
+    database_url: str = "sqlite+aiosqlite:///./printguard.db"
 
 
 @lru_cache

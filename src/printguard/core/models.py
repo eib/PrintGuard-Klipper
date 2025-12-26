@@ -21,6 +21,7 @@ class RTCOffer(BaseModel):
     session_id: str
     settings: FeedSettings = FeedSettings()
     device_name: str = "Camera"
+    printer_id: Optional[str] = None
 
 
 class PushSubscriptionInfo(BaseModel):
@@ -99,12 +100,40 @@ class CFZone(BaseModel):
     name: str
 
 
+class CFTunnel(BaseModel):
+    """Cloudflare tunnel info."""
+    id: str
+    name: str
+    tunnel_secret: str = ""
+    account_id: str = ""
+
+
+class CFDNSRecord(BaseModel):
+    """Cloudflare DNS record info."""
+    id: str
+    name: str
+
+
 class CFTunnelRequest(BaseModel):
     """Request to create a Cloudflare tunnel."""
     account_id: str
     zone_id: str
     tunnel_name: str
     subdomain: str = "camera"
+    overwrite_tunnel: bool = False
+    overwrite_dns: bool = False
+
+
+class CFExistenceResponse(BaseModel):
+    """Response checking if Cloudflare resources exist."""
+    tunnel_exists: bool
+    dns_exists: bool
+
+
+class DependencyStatus(BaseModel):
+    """Installation status of external dependencies."""
+    ngrok_installed: bool
+    cloudflared_installed: bool
 
 
 class CFTunnelResponse(BaseModel):
@@ -142,12 +171,35 @@ class PrinterStatus(str, Enum):
     DISCONNECTED = "disconnected"
 
 
+class ComponentConfig(BaseModel):
+    """Configuration for a single printer component."""
+    id: Optional[str] = None
+    name: Optional[str] = None
+    provider: Optional[str] = None
+    config: dict = {}
+
+
+class ComponentInfo(BaseModel):
+    """Full component information."""
+    id: str
+    name: Optional[str] = None
+    type: str
+    provider: str
+    entity_config: dict = {}
+
+
+class PrinterComponents(BaseModel):
+    """Modular printer components."""
+    status: Optional[ComponentConfig | str] = None
+    camera: Optional[ComponentConfig | str] = None
+    control: Optional[ComponentConfig | str] = None
+
+
 class PrinterConfig(BaseModel):
     """Configuration for a printer instance."""
-    id: str
+    id: Optional[str] = None
     name: str
-    provider: str
-    config: dict = {}
+    components: PrinterComponents
     linked_session_id: Optional[str] = None
     client_public_key: Optional[str] = None
 
@@ -156,6 +208,50 @@ class PrinterInfo(BaseModel):
     """Printer status response."""
     id: str
     name: str
-    provider: str
     status: PrinterStatus
     linked_session_id: Optional[str] = None
+    has_control: bool = False
+    has_camera: bool = False
+    components: Optional[dict[str, ComponentInfo]] = None
+
+
+class ConnectionInfo(BaseModel):
+    """Connection information."""
+    id: str
+    name: str
+    provider: str
+    config: dict
+
+
+class ConnectionCreate(BaseModel):
+    """Request to create a new connection."""
+    name: str
+    provider: str
+    config: dict
+
+
+class ConnectionUpdate(BaseModel):
+    """Request to update a connection."""
+    name: Optional[str] = None
+    config: Optional[dict] = None
+
+
+class ComponentCreate(BaseModel):
+    """Request to create a new component."""
+    name: str
+    type: str  # camera, control, status
+    provider: str
+    connection_id: Optional[str] = None
+    entity_config: dict = {}
+
+
+class ComponentUpdate(BaseModel):
+    """Request to update a component."""
+    name: Optional[str] = None
+    entity_config: Optional[dict] = None
+
+
+class PrinterUpdate(BaseModel):
+    """Request to update a printer."""
+    name: Optional[str] = None
+    components: Optional[PrinterComponents] = None

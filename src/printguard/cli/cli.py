@@ -2,14 +2,71 @@
 
 import typer
 import os
+import asyncio
 from typing import Annotated
 from ..core.config import TunnelProvider
+from ..core.database import async_session, init_db
+from ..core.db_models import User, M2MApplication
+from ..core.hashing import get_password_hash
+from ..core.utils import generate_random_string
+from sqlalchemy import select
 
 app = typer.Typer(
     name="printguard",
     help="PrintGuard CLI - 3D print failure detection service utilities.",
     add_completion=False,
 )
+
+user_app = typer.Typer(help="Manage users.")
+m2m_app = typer.Typer(help="Manage M2M applications.")
+app.add_typer(user_app, name="user")
+app.add_typer(m2m_app, name="m2m")
+
+
+@user_app.command("add")
+def user_add(
+    username: str,
+    password: str = typer.Option(..., prompt=True, hide_input=True),
+    scopes: str = "printer:read printer:write rtc:stream",
+) -> None:
+    """Add a new user."""
+    async def _add():
+        await init_db()
+        async with async_session() as session:
+            hashed = get_password_hash(password)
+            user = User(username=username, hashed_password=hashed, scopes=scopes)
+            session.add(user)
+            await session.commit()
+            typer.echo(f"User {username} added successfully.")
+
+    asyncio.run(_add())
+
+
+@m2m_app.command("add")
+def m2m_add(
+    name: str,
+    scopes: str = "printer:read rtc:stream",
+) -> None:
+    """Add a new M2M application and generate keys."""
+    async def _add():
+        await init_db()
+        async with async_session() as session:
+            client_id = generate_random_string(16)
+            client_secret = generate_random_string(32)
+            hashed_secret = get_password_hash(client_secret)
+            m2m = M2MApplication(
+                name=name,
+                client_id=client_id,
+                hashed_client_secret=hashed_secret,
+                scopes=scopes
+            )
+            session.add(m2m)
+            await session.commit()
+            typer.echo(typer.style(f"M2M Application '{name}' added successfully!", fg=typer.colors.GREEN, bold=True))
+            typer.echo(f"Client ID:     {client_id}")
+            typer.echo(f"Client Secret: {client_secret}")
+            typer.echo(typer.style("Store the secret safely; it won't be shown again.", fg=typer.colors.YELLOW))
+    asyncio.run(_add())
 
 
 @app.command()
@@ -174,7 +231,6 @@ def serve(
         os.environ["NGROK_DOMAIN"] = ngrok_domain
     if ngrok_edge:
         os.environ["NGROK_EDGE"] = ngrok_edge
-
     if tunnel == TunnelProvider.CLOUDFLARE:
         from ..services.tunnel import is_cloudflared_installed
         if not is_cloudflared_installed():
@@ -186,7 +242,6 @@ def serve(
                 ),
                 err=True
             )
-
     if tunnel == TunnelProvider.NGROK:
         from ..services.ngrok import is_ngrok_installed
         if not is_ngrok_installed():
@@ -198,7 +253,6 @@ def serve(
                 ),
                 err=True
             )
-
     try:
         import uvicorn
     except ImportError:
@@ -232,7 +286,6 @@ def version() -> None:
         ver = get_version("printguard")
     except Exception:
         ver = "0.1.0 (development)"
-    
     typer.echo(f"PrintGuard version: {ver}")
 
 

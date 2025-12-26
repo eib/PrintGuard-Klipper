@@ -10,7 +10,6 @@ onnxruntime
 python-multipart
 pywebpush
 pydantic-settings
-cloudflare
 ngrok
 httpx
 cryptography
@@ -18,3 +17,7 @@ paho-mqtt
 opencv-python-headless
 websockets
 av
+passlib[bcrypt]
+python-jose[cryptography]
+sqlalchemy
+aiosqlite
