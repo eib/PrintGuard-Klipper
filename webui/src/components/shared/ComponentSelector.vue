@@ -41,7 +41,7 @@ const filteredComponents = computed(() => {
 })
 
 const selectedComponent = computed(() => 
-  store.components.find(c => c.id === props.modelValue) || null
+  store.componentRegistry[props.modelValue || ''] || null
 )
 
 function toggleDropdown() {

@@ -40,7 +40,7 @@ const formData = ref<PrinterCreate>({
 
 watch([() => props.show, () => props.printer], ([show, printer]) => {
   if (show) {
-    compStore.fetchAll()
+    compStore.fetchAll(undefined, true)
 
     if (printer) {
       const comps = printer.components || {}

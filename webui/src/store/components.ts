@@ -5,6 +5,7 @@ import type { Component, ComponentCreate, ComponentUpdate } from '../types'
 
 export const useComponentsStore = defineStore('components', () => {
   const components = ref<Component[]>([])
+  const componentRegistry = ref<Record<string, Component>>({})
   const loading = ref(false)
   const error = ref<string | null>(null)
   const filters = ref<any>({})
@@ -16,12 +17,19 @@ export const useComponentsStore = defineStore('components', () => {
       } else {
         filters.value = { ...filters.value, ...newFilters }
       }
+    } else if (replace) {
+      filters.value = {}
     }
+
     loading.value = true
     error.value = null
     try {
       const response = await componentsApi.list(filters.value)
       components.value = response.data
+
+      response.data.forEach(comp => {
+        componentRegistry.value[comp.id] = comp
+      })
     } catch (e: any) {
       error.value = e.response?.data?.detail || 'Failed to fetch components'
       console.error(e)
@@ -33,6 +41,7 @@ export const useComponentsStore = defineStore('components', () => {
   async function create(data: ComponentCreate) {
     const response = await componentsApi.create(data)
     components.value.push(response.data)
+    componentRegistry.value[response.data.id] = response.data
     return response.data
   }
 
@@ -42,16 +51,19 @@ export const useComponentsStore = defineStore('components', () => {
     if (index !== -1) {
       components.value[index] = response.data
     }
+    componentRegistry.value[id] = response.data
     return response.data
   }
 
   async function remove(id: string, force = false) {
     await componentsApi.delete(id, force)
     components.value = components.value.filter(c => c.id !== id)
+    delete componentRegistry.value[id]
   }
 
   return {
     components,
+    componentRegistry,
     loading,
     filters,
     error,
