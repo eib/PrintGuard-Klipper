@@ -37,6 +37,10 @@ class StatusSource(BaseProvider, ABC):
         """Return True if printer is actively printing."""
         ...
 
+    async def get_status(self) -> str:
+        """Return generic printer status string."""
+        return "printing" if await self.is_printing() else "idle"
+
 
 class CameraSource(BaseProvider, ABC):
     """Interface for providing a camera feed."""

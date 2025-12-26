@@ -8,18 +8,11 @@ from homeassistant.core import HomeAssistant, ServiceCall
 
 from .api import PrintGuardApiClient
 from .const import (
-    CONF_CAMERA,
     CONF_CLIENT_ID,
     CONF_CLIENT_PRIVATE_KEY,
     CONF_CLIENT_PUBLIC_KEY,
     CONF_CLIENT_SECRET,
-    CONF_PAUSE_ENTITY,
-    CONF_PRINTER_NAME,
-    CONF_PRINTERS,
-    CONF_RESUME_ENTITY,
     CONF_SERVER_PUBLIC_KEY,
-    CONF_START_ENTITY,
-    CONF_STOP_ENTITY,
     CONF_TOKEN,
     CONF_URL,
     DOMAIN,
@@ -51,13 +44,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     except Exception as err:
         _LOGGER.debug("Could not refresh server public key at startup: %s", err)
     coordinator = PrintGuardDataUpdateCoordinator(hass, entry, api_client)
-    stored_printers = entry.options.get(CONF_PRINTERS, []) or entry.data.get(CONF_PRINTERS, [])
-    token = entry.data.get(CONF_TOKEN)
-    for printer in stored_printers:
-        try:
-            await api_client.register_printer(hass, token, printer)
-        except Exception as err:
-            _LOGGER.warning("Failed to re-register printer %s: %s", printer.get(CONF_PRINTER_NAME), err)
     await coordinator.async_config_entry_first_refresh()
     hass.data[DOMAIN][entry.entry_id] = {
         "coordinator": coordinator,

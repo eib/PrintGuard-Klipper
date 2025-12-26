@@ -21,20 +21,15 @@ from .api import (
     PrintGuardApiClient,
 )
 from .const import (
-    CONF_CAMERA,
     CONF_CLIENT_ID,
     CONF_CLIENT_PRIVATE_KEY,
     CONF_CLIENT_PUBLIC_KEY,
     CONF_CLIENT_SECRET,
-    CONF_ENABLE_NOTIFICATIONS,
-    CONF_NOTIFY_SERVICE,
-    CONF_PAUSE_ENTITY,
-    CONF_PRINTER_NAME,
-    CONF_PRINTERS,
-    CONF_RESUME_ENTITY,
+    CONF_CONNECTION_ID,
+    CONF_ERROR_STATES,
+    CONF_PAUSED_STATES,
+    CONF_PRINTING_STATES,
     CONF_SERVER_PUBLIC_KEY,
-    CONF_START_ENTITY,
-    CONF_STOP_ENTITY,
     CONF_TOKEN,
     CONF_URL,
     DOMAIN,
@@ -51,30 +46,6 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
         vol.Required(CONF_TOKEN): str,
     }
 )
-
-
-def get_add_printer_schema(_hass: HomeAssistant) -> vol.Schema:
-    """Get the schema for adding a printer."""
-    return vol.Schema(
-        {
-            vol.Required(CONF_PRINTER_NAME): str,
-            vol.Required(CONF_CAMERA): selector.EntitySelector(
-                selector.EntitySelectorConfig(domain="camera")
-            ),
-            vol.Optional(CONF_START_ENTITY): selector.EntitySelector(
-                selector.EntitySelectorConfig()
-            ),
-            vol.Optional(CONF_PAUSE_ENTITY): selector.EntitySelector(
-                selector.EntitySelectorConfig()
-            ),
-            vol.Optional(CONF_RESUME_ENTITY): selector.EntitySelector(
-                selector.EntitySelectorConfig()
-            ),
-            vol.Optional(CONF_STOP_ENTITY): selector.EntitySelector(
-                selector.EntitySelectorConfig()
-            ),
-        }
-    )
 
 
 async def _fetch_server_public_key(hass: HomeAssistant, url: str) -> str:
@@ -115,35 +86,17 @@ def _build_api_client(hass: HomeAssistant, data: dict[str, Any]) -> PrintGuardAp
         data.get(CONF_CLIENT_PUBLIC_KEY),
     )
 
-
-async def _register_printer_with_errors(
-    hass: HomeAssistant,
-    api_client: PrintGuardApiClient,
-    token: str | None,
-    printer_input: dict[str, Any],
-) -> tuple[dict[str, Any] | None, str | None]:
-    """Register printer and return (printer, error_key)."""
-    try:
-        registered_printer = await api_client.register_printer(hass, token, printer_input)
-        return registered_printer, None
-    except CannotConnect:
-        return None, "cannot_connect"
-    except PrinterAlreadyExists:
-        return None, "printer_already_exists"
-    except InvalidPrinterConfig as err:
-        _LOGGER.error("Invalid printer config: %s", err)
-        return None, "invalid_config"
-    except Exception:
-        _LOGGER.exception("Unexpected exception while adding printer")
-        return None, "unknown"
-
 class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle a config flow for PrintGuard."""
+
     VERSION = 1
 
     def __init__(self) -> None:
         """Initialize the config flow."""
-        self._base_data: dict[str, Any] | None = None
+        self._base_data: dict[str, Any] = {}
+        self._cameras: list[str] = []
+        self._sensors: list[str] = []
+        self._controls: list[str] = []
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -162,26 +115,31 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 ).decode("utf-8")
                 user_input[CONF_CLIENT_PUBLIC_KEY] = handler.get_public_key_b64()
                 await validate_input(self.hass, user_input)
+                
+                api_client = _build_api_client(self.hass, user_input)
+                await api_client._get_access_token()
+                
+                # Register HA as a connection
+                hass_url = self.hass.config.internal_url or self.hass.config.external_url or "http://localhost:8123"
+                connection = await api_client.create_connection(
+                    name="Home Assistant",
+                    provider="homeassistant",
+                    config={
+                        "hass_url": hass_url,
+                        "token": user_input[CONF_TOKEN]
+                    }
+                )
+                user_input[CONF_CONNECTION_ID] = connection["id"]
+                
+                self._base_data = user_input
+                return await self.async_step_cameras()
+                
             except CannotConnect:
                 errors["base"] = "cannot_connect"
             except Exception:
                 _LOGGER.exception("Unexpected exception")
                 errors["base"] = "unknown"
-            else:
-                self._base_data = user_input
-                try:
-                    api_client = _build_api_client(self.hass, user_input)
-                    await api_client._get_access_token()
-                except CannotConnect:
-                    errors["base"] = "invalid_auth"
-                    return self.async_show_form(
-                        step_id="user",
-                        data_schema=self.add_suggested_values_to_schema(
-                            STEP_USER_DATA_SCHEMA, user_input
-                        ),
-                        errors=errors,
-                    )
-                return await self.async_step_printer()
+
         return self.async_show_form(
             step_id="user",
             data_schema=self.add_suggested_values_to_schema(
@@ -190,169 +148,118 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
-    async def async_step_printer(
+    async def async_step_cameras(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Handle selecting the printer camera and controls."""
-        errors: dict[str, str] = {}
-        if not self._base_data:
-            return await self.async_step_user()
+        """Handle selecting cameras to export."""
         if user_input is not None:
-            token = self._base_data.get(CONF_TOKEN)
-            api_client = _build_api_client(self.hass, self._base_data)
-            registered_printer, err_key = await _register_printer_with_errors(
-                self.hass, api_client, token, user_input
-            )
-            if err_key:
-                errors["base"] = err_key
-            else:
-                data = dict(self._base_data)
-                data[CONF_PRINTERS] = [registered_printer]
-                return self.async_create_entry(title="PrintGuard", data=data)
+            self._cameras = user_input["cameras"]
+            return await self.async_step_sensors()
+
         return self.async_show_form(
-            step_id="printer",
-            data_schema=get_add_printer_schema(self.hass),
-            errors=errors,
+            step_id="cameras",
+            data_schema=vol.Schema({
+                vol.Required("cameras"): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain="camera", multiple=True)
+                )
+            })
         )
 
-    @staticmethod
-    @callback
-    def async_get_options_flow(
-        config_entry: config_entries.ConfigEntry,
-    ) -> config_entries.OptionsFlow:
-        """Create the options flow."""
-        return OptionsFlowHandler(config_entry)
-
-
-class OptionsFlowHandler(config_entries.OptionsFlow):
-    """Handle options flow for PrintGuard."""
-
-    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
-        """Initialize options flow."""
-        self.config_entry = config_entry
-        self._printer_to_remove: str | None = None
-
-    async def async_step_init(
-        self, _user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
-        """Manage the options - show menu."""
-        return self.async_show_menu(
-            step_id="init",
-            menu_options=["add_printer", "manage_printers", "notifications"],
-        )
-
-    async def async_step_notifications(
+    async def async_step_sensors(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Handle notification settings."""
+        """Handle selecting status sensors to export."""
         if user_input is not None:
-            options = dict(self.config_entry.options)
-            options[CONF_ENABLE_NOTIFICATIONS] = user_input.get(
-                CONF_ENABLE_NOTIFICATIONS, False
-            )
-            options[CONF_NOTIFY_SERVICE] = user_input.get(CONF_NOTIFY_SERVICE, "")
-            return self.async_create_entry(title="", data=options)
-        notify_services = [
-            f"notify.{service}"
-            for service in self.hass.services.async_services().get("notify", {})
-        ]
-        current_enabled = self.config_entry.options.get(
-            CONF_ENABLE_NOTIFICATIONS, False
-        )
-        current_service = self.config_entry.options.get(CONF_NOTIFY_SERVICE, "")
-        schema = vol.Schema(
-            {
-                vol.Required(
-                    CONF_ENABLE_NOTIFICATIONS, default=current_enabled
-                ): bool,
-                vol.Optional(CONF_NOTIFY_SERVICE, default=current_service): (
-                    selector.SelectSelector(
-                        selector.SelectSelectorConfig(
-                            options=notify_services,
-                            mode=selector.SelectSelectorMode.DROPDOWN,
-                            custom_value=True,
-                        )
-                    )
-                    if notify_services
-                    else str
-                ),
-            }
-        )
+            self._sensors = user_input["sensors"]
+            return await self.async_step_status_mapping()
 
-        return self.async_show_form(step_id="notifications", data_schema=schema)
-
-    async def async_step_add_printer(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
-        """Handle adding a new printer."""
-        errors: dict[str, str] = {}
-
-        if user_input is not None:
-            token = self.config_entry.data.get(CONF_TOKEN)
-            api_client = _build_api_client(self.hass, self.config_entry.data)
-            registered_printer, err_key = await _register_printer_with_errors(
-                self.hass, api_client, token, user_input
-            )
-            if registered_printer:
-                options = dict(self.config_entry.options)
-                printers = list(options.get(CONF_PRINTERS, []))
-                printers.append(registered_printer)
-                options[CONF_PRINTERS] = printers
-                return self.async_create_entry(title="", data=options)
-            if err_key:
-                errors["base"] = err_key
         return self.async_show_form(
-            step_id="add_printer",
-            data_schema=get_add_printer_schema(self.hass),
-            errors=errors,
+            step_id="sensors",
+            data_schema=vol.Schema({
+                vol.Required("sensors"): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain=["sensor", "binary_sensor"], multiple=True)
+                )
+            })
         )
 
-    async def async_step_manage_printers(
+    async def async_step_status_mapping(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Handle managing existing printers."""
-        printers = self.config_entry.options.get(CONF_PRINTERS, [])
-        if not printers:
-            return self.async_abort(reason="no_printers")
+        """Handle defining status mapping for sensors."""
         if user_input is not None:
-            selected = user_input.get("printer")
-            if selected:
-                self._printer_to_remove = selected
-                return await self.async_step_confirm_remove()
-        printer_options = {
-            p["printer_id"]: f"{p[CONF_PRINTER_NAME]} ({p[CONF_CAMERA]})"
-            for p in printers
-        }
+            self._base_data.update(user_input)
+            return await self.async_step_controls()
+
         return self.async_show_form(
-            step_id="manage_printers",
-            data_schema=vol.Schema(
-                {vol.Required("printer"): vol.In(printer_options)}
-            ),
+            step_id="status_mapping",
+            data_schema=vol.Schema({
+                vol.Required(CONF_PRINTING_STATES, default="printing,on,active"): str,
+                vol.Required(CONF_PAUSED_STATES, default="paused"): str,
+                vol.Required(CONF_ERROR_STATES, default="error,unavailable,unknown"): str,
+            })
         )
 
-    async def async_step_confirm_remove(
+    async def async_step_controls(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Confirm printer removal."""
+        """Handle selecting control entities to export."""
         if user_input is not None:
-            options = dict(self.config_entry.options)
-            printers = [
-                p
-                for p in options.get(CONF_PRINTERS, [])
-                if p["printer_id"] != self._printer_to_remove
-            ]
-            options[CONF_PRINTERS] = printers
-            url = self.config_entry.data[CONF_URL].rstrip("/")
-            api_client = PrintGuardApiClient(
-                self.hass,
-                url,
-                self.config_entry.data.get(CONF_SERVER_PUBLIC_KEY),
-                self.config_entry.data.get(CONF_CLIENT_PRIVATE_KEY),
-                self.config_entry.data.get(CONF_CLIENT_PUBLIC_KEY),
+            self._controls = user_input["controls"]
+            await self._export_components()
+            return self.async_create_entry(title="PrintGuard", data=self._base_data)
+
+        return self.async_show_form(
+            step_id="controls",
+            data_schema=vol.Schema({
+                vol.Required("controls"): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain=["switch", "button"], multiple=True)
+                )
+            })
+        )
+
+    async def _export_components(self) -> None:
+        """Export all selected entities to PrintGuard API."""
+        api_client = _build_api_client(self.hass, self._base_data)
+        conn_id = self._base_data[CONF_CONNECTION_ID]
+        
+        # Export Cameras
+        for entity_id in self._cameras:
+            state = self.hass.states.get(entity_id)
+            name = state.name if state else entity_id
+            await api_client.create_component(
+                name=name,
+                type="camera",
+                provider="homeassistant",
+                connection_id=conn_id,
+                entity_config={"entity_id": entity_id}
             )
-            await api_client.delete_printer(self._printer_to_remove)
-            return self.async_create_entry(title="", data=options)
-        return self.async_show_form(
-            step_id="confirm_remove",
-            description_placeholders={"printer_id": self._printer_to_remove},
+            
+        # Export Status Sensors
+        for entity_id in self._sensors:
+            state = self.hass.states.get(entity_id)
+            name = state.name if state else entity_id
+            await api_client.create_component(
+                name=name,
+                type="status",
+                provider="homeassistant",
+                connection_id=conn_id,
+                entity_config={
+                    "entity_id": entity_id,
+                    CONF_PRINTING_STATES: self._base_data[CONF_PRINTING_STATES],
+                    CONF_PAUSED_STATES: self._base_data[CONF_PAUSED_STATES],
+                    CONF_ERROR_STATES: self._base_data[CONF_ERROR_STATES],
+                }
+            )
+            
+        # Export Controls
+        for entity_id in self._controls:
+            state = self.hass.states.get(entity_id)
+            name = state.name if state else entity_id
+            await api_client.create_component(
+                name=name,
+                type="control",
+                provider="homeassistant",
+                connection_id=conn_id,
+            entity_config={"entity_id": entity_id}
         )
+

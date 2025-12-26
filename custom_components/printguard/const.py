@@ -7,19 +7,15 @@ CONF_URL = "url"
 CONF_CLIENT_ID = "client_id"
 CONF_CLIENT_SECRET = "client_secret"
 CONF_TOKEN = "token"
+CONF_CONNECTION_ID = "connection_id"
 
-# Printer configuration
-CONF_PRINTERS = "printers"
-CONF_PRINTER_NAME = "name"
-CONF_CAMERA = "camera"
-CONF_START_ENTITY = "start_entity"
-CONF_PAUSE_ENTITY = "pause_entity"
-CONF_RESUME_ENTITY = "resume_entity"
-CONF_STOP_ENTITY = "stop_entity"
+# Status mapping
+CONF_PRINTING_STATES = "printing_states"
+CONF_PAUSED_STATES = "paused_states"
+CONF_ERROR_STATES = "error_states"
 
-# Notification configuration
-CONF_NOTIFY_SERVICE = "notify_service"
-CONF_ENABLE_NOTIFICATIONS = "enable_notifications"
+# Polling interval (seconds)
+SCAN_INTERVAL_SECONDS = 10
 
 # Crypto configuration
 CONF_SERVER_PUBLIC_KEY = "server_public_key"
@@ -31,6 +27,3 @@ EVENT_DEFECT_DETECTED = f"{DOMAIN}_defect_detected"
 
 # Platforms to set up
 PLATFORMS = ["sensor", "binary_sensor", "button", "camera", "event"]
-
-# Polling interval (seconds)
-SCAN_INTERVAL_SECONDS = 10

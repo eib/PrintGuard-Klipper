@@ -12,24 +12,34 @@
           "token": "Create one in Home Assistant: Settings → Profile → Long-Lived Access Tokens"
         }
       },
-      "printer": {
-        "title": "Add Printer",
-        "description": "Choose the camera and optional control entities for your printer.",
+      "cameras": {
+        "title": "Export Cameras",
+        "description": "Select the cameras you want to monitor with PrintGuard.",
         "data": {
-          "name": "Printer Name",
-          "camera": "Camera Entity",
-          "start_entity": "Start Print Entity",
-          "pause_entity": "Pause Print Entity",
-          "resume_entity": "Resume Print Entity",
-          "stop_entity": "Stop Print Entity"
-        },
-        "data_description": {
-          "name": "A friendly name for your printer",
-          "camera": "The camera entity that monitors your printer",
-          "start_entity": "Optional: Entity to start/resume printing",
-          "pause_entity": "Optional: Entity to pause printing",
-          "resume_entity": "Optional: Entity to resume printing",
-          "stop_entity": "Optional: Entity to stop/cancel printing"
+          "cameras": "Cameras"
+        }
+      },
+      "sensors": {
+        "title": "Export Status Sensors",
+        "description": "Select the sensors that provide the status of your printers.",
+        "data": {
+          "sensors": "Status Sensors"
+        }
+      },
+      "status_mapping": {
+        "title": "Status Mapping",
+        "description": "Define which states mean what for your sensors. Use comma-separated lists (e.g., 'printing, active, on').",
+        "data": {
+          "printing_states": "Printing States",
+          "paused_states": "Paused States",
+          "error_states": "Error States"
+        }
+      },
+      "controls": {
+        "title": "Export Controls",
+        "description": "Select the switches or buttons you want to use for printer control.",
+        "data": {
+          "controls": "Control Entities"
         }
       }
     },
@@ -38,70 +48,6 @@
       "printer_already_exists": "A printer with this camera is already registered",
       "invalid_config": "Invalid printer configuration",
       "unknown": "An unexpected error occurred"
-    }
-  },
-  "options": {
-    "step": {
-      "init": {
-        "title": "PrintGuard Options",
-        "menu_options": {
-          "add_printer": "Add a new printer",
-          "manage_printers": "Manage existing printers",
-          "notifications": "Configure notifications"
-        }
-      },
-      "add_printer": {
-        "title": "Add Printer",
-        "description": "Configure a new printer to monitor with PrintGuard",
-        "data": {
-          "name": "Printer Name",
-          "camera": "Camera Entity",
-          "start_entity": "Start Print Entity",
-          "pause_entity": "Pause Print Entity",
-          "resume_entity": "Resume Print Entity",
-          "stop_entity": "Stop Print Entity"
-        },
-        "data_description": {
-          "name": "A friendly name for your printer",
-          "camera": "The camera entity that monitors your printer",
-          "start_entity": "Optional: Entity to start/resume printing",
-          "pause_entity": "Optional: Entity to pause printing",
-          "resume_entity": "Optional: Entity to resume printing",
-          "stop_entity": "Optional: Entity to stop/cancel printing"
-        }
-      },
-      "manage_printers": {
-        "title": "Manage Printers",
-        "description": "Select a printer to remove",
-        "data": {
-          "printer": "Select Printer"
-        }
-      },
-      "confirm_remove": {
-        "title": "Confirm Removal",
-        "description": "Are you sure you want to remove printer '{printer_id}'? This will also unregister it from the PrintGuard server."
-      },
-      "notifications": {
-        "title": "Notification Settings",
-        "description": "Configure how you want to be notified when print defects are detected",
-        "data": {
-          "enable_notifications": "Enable Notifications",
-          "notify_service": "Notification Service"
-        },
-        "data_description": {
-          "enable_notifications": "Send notifications when defects are detected",
-          "notify_service": "The notification service to use (e.g., notify.mobile_app)"
-        }
-      }
-    },
-    "error": {
-      "cannot_connect": "Cannot connect to PrintGuard server",
-      "printer_already_exists": "A printer with this camera is already registered",
-      "invalid_config": "Invalid printer configuration",
-      "unknown": "An unexpected error occurred"
-    },
-    "abort": {
-      "no_printers": "No printers configured. Add a printer first."
     }
   },
   "entity": {

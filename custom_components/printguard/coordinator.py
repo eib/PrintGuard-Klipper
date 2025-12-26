@@ -13,8 +13,6 @@ from homeassistant.helpers.dispatcher import async_dispatcher_send
 
 from .api import PrintGuardApiClient
 from .const import (
-    CONF_ENABLE_NOTIFICATIONS,
-    CONF_NOTIFY_SERVICE,
     CONF_PRINTER_NAME,
     DOMAIN,
     EVENT_DEFECT_DETECTED,
@@ -51,13 +49,12 @@ class PrintGuardDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             printers = await self.api_client.get_printers()
             new_data: dict[str, Any] = {}
             for printer in printers:
-                p_id = printer["printer_id"]
-                full_info = await self.api_client.get_printer(p_id)
+                p_id = printer["id"]
                 prediction = None
-                if full_info and (session_id := full_info.get("linked_session_id")):
+                if session_id := printer.get("linked_session_id"):
                     prediction = await self.api_client.get_prediction_result(session_id)
                 new_data[p_id] = {
-                    "info": full_info or printer,
+                    "info": printer,
                     "prediction": prediction
                 }
                 await self._check_changes(p_id, new_data[p_id])
@@ -67,7 +64,7 @@ class PrintGuardDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             raise UpdateFailed(f"Error communicating with API: {err}") from err
 
     async def _check_changes(self, printer_id: str, data: dict[str, Any]) -> None:
-        """Detect status changes and trigger events/notifications."""
+        """Detect status changes and trigger events."""
         prediction = data.get("prediction")
         if not prediction or prediction.get("status") != "success":
             return
@@ -101,22 +98,4 @@ class PrintGuardDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "session_id": session_id,
             },
         )
-        if self.entry.options.get(CONF_ENABLE_NOTIFICATIONS):
-            service = self.entry.options.get(CONF_NOTIFY_SERVICE)
-            if service:
-                await self._send_notification(
-                    service,
-                    f"Print Error Detected: {printer_name}",
-                    f"Detected {class_name} with {confidence:.0%} confidence",
-                )
-
-    async def _send_notification(self, service: str, title: str, message: str) -> None:
-        """Send a notification via the configured service."""
-        try:
-            domain, service_name = service.split(".", 1) if "." in service else ("notify", service)
-            await self.hass.services.async_call(
-                domain, service_name, {"title": title, "message": message}
-            )
-        except Exception as err:
-            _LOGGER.error("Failed to send notification: %s", err)
 

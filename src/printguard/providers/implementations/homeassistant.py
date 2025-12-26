@@ -21,7 +21,10 @@ class HomeAssistantProvider(PrinterProvider):
                  start_entity_id: Optional[str] = None,
                  pause_entity_id: Optional[str] = None,
                  resume_entity_id: Optional[str] = None,
-                 stop_entity_id: Optional[str] = None):
+                 stop_entity_id: Optional[str] = None,
+                 printing_states: Optional[str] = None,
+                 paused_states: Optional[str] = None,
+                 error_states: Optional[str] = None):
         self.hass_url = hass_url.rstrip("/")
         self.token = token
         self.entity_id = entity_id
@@ -29,6 +32,9 @@ class HomeAssistantProvider(PrinterProvider):
         self.pause_entity_id = pause_entity_id
         self.resume_entity_id = resume_entity_id
         self.stop_entity_id = stop_entity_id
+        self.printing_states = [s.strip().lower() for s in (printing_states or "printing,on,active").split(",")]
+        self.paused_states = [s.strip().lower() for s in (paused_states or "paused").split(",")]
+        self.error_states = [s.strip().lower() for s in (error_states or "error,unavailable,unknown").split(",")]
         self.headers = {
             "Authorization": f"Bearer {self.token}",
             "Content-Type": "application/json"
@@ -48,7 +54,10 @@ class HomeAssistantProvider(PrinterProvider):
                 {"name": "token", "type": "password", "required": True, "label": "Access Token"}
             ],
             "entity_fields": [
-                {"name": "entity_id", "type": "string", "required": True, "label": "Entity ID"}
+                {"name": "entity_id", "type": "string", "required": True, "label": "Entity ID"},
+                {"name": "printing_states", "type": "string", "required": False, "label": "Printing States (comma separated)", "default": "printing,on,active"},
+                {"name": "paused_states", "type": "string", "required": False, "label": "Paused States (comma separated)", "default": "paused"},
+                {"name": "error_states", "type": "string", "required": False, "label": "Error States (comma separated)", "default": "error,unavailable,unknown"}
             ]
         }
 
@@ -181,13 +190,30 @@ class HomeAssistantProvider(PrinterProvider):
 
     async def is_printing(self) -> bool:
         """Check if the printer is currently printing."""
+        return await self.get_status() == "printing"
+
+    async def get_status(self) -> str:
+        """Get the current status of the printer."""
         if not self.client:
             await self.connect()
-        response = await self.client.get(f"/api/states/{self.entity_id}")
-        response.raise_for_status()
-        data = response.json()
-        state = data.get("state", "").lower()
-        return state in ["printing", "on", "active"] or self.entity_id.startswith("camera.")
+        try:
+            response = await self.client.get(f"/api/states/{self.entity_id}")
+            response.raise_for_status()
+            data = response.json()
+            state = data.get("state", "").lower()
+            
+            if state in self.error_states:
+                return "error"
+            if state in self.printing_states:
+                return "printing"
+            if state in self.paused_states:
+                return "paused"
+            if self.entity_id.startswith("camera."):
+                return "printing"
+            return "idle"
+        except Exception as e:
+            logger.error(f"Failed to get status for {self.entity_id}: {e}")
+            return "error"
 
     async def start(self) -> None:
         """Start/resume the print job."""

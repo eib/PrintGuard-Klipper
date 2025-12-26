@@ -168,13 +168,61 @@ class PrintGuardApiClient:
         resp = await self._request("GET", "/api/printer/")
         if resp.status == 200:
             printers = await self._decrypt_response(resp)
-            return [{"printer_id": p["id"], "name": p["name"], "status": p.get("status"), "provider": p.get("provider")} for p in printers]
+            return printers
         return []
 
     async def get_printer(self, printer_id: str) -> dict | None:
         """Fetch a single printer."""
         resp = await self._request("GET", f"/api/printer/{printer_id}")
         return await self._decrypt_response(resp) if resp.status == 200 else None
+
+    async def send_printer_command(self, printer_id: str, command: str) -> bool:
+        """Send a command to a printer."""
+        resp = await self._request("POST", f"/api/printer/{printer_id}/{command}")
+        return resp.status == 200
+
+    async def get_connections(self) -> list[dict]:
+        """Fetch all connections."""
+        resp = await self._request("GET", "/api/connections")
+        if resp.status == 200:
+            return await self._decrypt_response(resp)
+        return []
+
+    async def create_connection(self, name: str, provider: str, config: dict) -> dict:
+        """Create a new connection."""
+        data = {"name": name, "provider": provider, "config": config}
+        resp = await self._request("POST", "/api/connections", data=data)
+        if resp.status == 200:
+            return await self._decrypt_response(resp)
+        detail = await self._read_error_detail(resp)
+        raise CannotConnect(detail)
+
+    async def create_component(
+        self,
+        name: str,
+        type: str,
+        provider: str,
+        connection_id: str | None,
+        entity_config: dict,
+    ) -> dict:
+        """Create a new component."""
+        data = {
+            "name": name,
+            "type": type,
+            "provider": provider,
+            "connection_id": connection_id,
+            "entity_config": entity_config,
+        }
+        resp = await self._request("POST", "/api/components", data=data)
+        if resp.status == 200:
+            return await self._decrypt_response(resp)
+        detail = await self._read_error_detail(resp)
+        raise InvalidPrinterConfig(detail)
+
+    async def delete_component(self, component_id: str) -> bool:
+        """Delete a component."""
+        resp = await self._request("DELETE", f"/api/components/{component_id}")
+        return resp.status in (200, 204)
 
     async def get_prediction_result(self, session_id: str) -> dict | None:
         """Fetch prediction result."""
@@ -245,78 +293,6 @@ class PrintGuardApiClient:
             detail,
         )
         return None
-
-    async def register_printer(self, hass: HomeAssistant, token: str, printer_data: dict) -> dict:
-        """Register a printer using the modular component structure."""
-        camera_id = printer_data[CONF_CAMERA]
-        printer_id = f"ha_{camera_id.replace('.', '_')}"
-        hass_url = (
-            hass.config.internal_url
-            or hass.config.external_url
-            or "http://localhost:8123"
-        )
-        components = {
-            "status": {
-                "provider": "homeassistant",
-                "config": {
-                    "hass_url": hass_url,
-                    "token": token,
-                    "entity_id": camera_id,
-                }
-            },
-            "camera": {
-                "provider": "homeassistant",
-                "config": {
-                    "hass_url": hass_url,
-                    "token": token,
-                    "entity_id": camera_id,
-                }
-            },
-            "control": {
-                "provider": "homeassistant",
-                "config": {
-                    "hass_url": hass_url,
-                    "token": token,
-                    "start_entity_id": printer_data.get(CONF_START_ENTITY),
-                    "pause_entity_id": printer_data.get(CONF_PAUSE_ENTITY),
-                    "resume_entity_id": printer_data.get(CONF_RESUME_ENTITY),
-                    "stop_entity_id": printer_data.get(CONF_STOP_ENTITY),
-                }
-            }
-        }
-        components["control"]["config"] = {
-            k: v for k, v in components["control"]["config"].items() if v
-        }
-        registration = {
-            "id": printer_id,
-            "name": printer_data[CONF_PRINTER_NAME],
-            "components": components,
-            "client_public_key": self._client_pub_key,
-        }
-        resp = await self._request("POST", "/api/printer/", data=registration)
-        if resp.status == 409:
-            return {"printer_id": printer_id, **printer_data}
-        if resp.status == 400:
-            try:
-                raw = await resp.text()
-            except Exception:
-                raw = ""
-            if "Decryption failed" in raw:
-                _LOGGER.warning("Server decryption failed; refreshing server public key and retrying once.")
-                await self.refresh_server_public_key()
-                resp = await self._request("POST", "/api/printer/", data=registration)
-                if resp.status == 409:
-                    return {"printer_id": printer_id, **printer_data}
-        if resp.status >= 400:
-            detail = await self._read_error_detail(resp)
-            _LOGGER.error(
-                "PrintGuard register_printer failed: status=%s detail=%s payload=%s",
-                resp.status,
-                detail,
-                registration,
-            )
-            raise InvalidPrinterConfig(detail)
-        return {"printer_id": printer_id, **printer_data}
 
     async def delete_printer(self, printer_id: str) -> bool:
         """Delete a printer."""

@@ -35,6 +35,7 @@ async def async_setup_entry(
     async_add_entities(
         PrintGuardCamera(coordinator, p_id, p_data["info"]["name"])
         for p_id, p_data in coordinator.data.items()
+        if p_data["info"].get("has_camera")
     )
 
 

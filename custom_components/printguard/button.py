@@ -19,7 +19,18 @@ async def async_setup_entry(
     data = hass.data[DOMAIN][entry.entry_id]
     coordinator = data["coordinator"]
 
-    async_add_entities([PrintGuardRefreshButton(coordinator)])
+    entities = [PrintGuardRefreshButton(coordinator)]
+    
+    for p_id, p_data in coordinator.data.items():
+        if p_data["info"].get("has_control"):
+            for command in ["start", "pause", "resume", "stop"]:
+                entities.append(
+                    PrintGuardControlButton(
+                        coordinator, p_id, p_data["info"]["name"], command
+                    )
+                )
+    
+    async_add_entities(entities)
 
 
 class PrintGuardRefreshButton(ButtonEntity):
@@ -36,4 +47,28 @@ class PrintGuardRefreshButton(ButtonEntity):
 
     async def async_press(self) -> None:
         """Refresh data."""
+        await self.coordinator.async_request_refresh()
+
+
+class PrintGuardControlButton(PrintGuardEntity, ButtonEntity):
+    """Button to control a PrintGuard printer."""
+
+    def __init__(self, coordinator, p_id, p_name, command) -> None:
+        """Initialize."""
+        super().__init__(coordinator, p_id, p_name)
+        self._command = command
+        self._attr_name = command.capitalize()
+        self._attr_unique_id = f"{DOMAIN}_{p_id}_{command}"
+        self._attr_icon = {
+            "start": "mdi:play",
+            "pause": "mdi:pause",
+            "resume": "mdi:play-pause",
+            "stop": "mdi:stop",
+        }.get(command)
+
+    async def async_press(self) -> None:
+        """Send command."""
+        await self.coordinator.api_client.send_printer_command(
+            self._printer_id, self._command
+        )
         await self.coordinator.async_request_refresh()
