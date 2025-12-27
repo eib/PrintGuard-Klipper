@@ -39,6 +39,7 @@ class VideoProcessor:
         self._results_buffer = deque(maxlen=50)
         self._inference_times = deque(maxlen=10)
         self._last_inference_time = 0
+        self.on_defect: Optional[Callable[[str, float], None]] = None
     
     def add_data_channel(self, channel: RTCDataChannel):
         """Add a data channel to send results to."""
@@ -158,6 +159,14 @@ class VideoProcessor:
                     if class_name and class_name != PredictionClass.NORMAL and class_name != self._last_notified_class:
                         self._last_notified_class = class_name
                         notify_defect(self.session_id, str(class_name), result_model.confidence or 0)
+                        if self.on_defect:
+                            try:
+                                if asyncio.iscoroutinefunction(self.on_defect):
+                                    asyncio.create_task(self.on_defect(str(class_name), result_model.confidence or 0))
+                                else:
+                                    self.on_defect(str(class_name), result_model.confidence or 0)
+                            except Exception as e:
+                                logger.error(f"Error in on_defect callback for session {self.session_id}: {e}")
                     elif class_name == PredictionClass.NORMAL:
                         self._last_notified_class = None
     

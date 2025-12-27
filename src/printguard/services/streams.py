@@ -15,7 +15,8 @@ class SourceStream:
         processor: VideoProcessor,
         pc: Optional[RTCPeerConnection] = None,
         device_name: str = "Camera",
-        settings: Optional[FeedSettings] = None
+        settings: Optional[FeedSettings] = None,
+        printer_id: Optional[str] = None
     ):
         self.source_id = source_id
         self.track = track
@@ -23,6 +24,7 @@ class SourceStream:
         self.pc = pc
         self.device_name = device_name
         self.settings = settings or FeedSettings()
+        self.printer_id = printer_id
         self.subscribers: Set[RTCPeerConnection] = set()
         self.aliases: Set[str] = {source_id}
 
@@ -38,7 +40,8 @@ class StreamManager:
         processor: VideoProcessor,
         pc: Optional[RTCPeerConnection] = None,
         device_name: str = "Camera",
-        settings: Optional[FeedSettings] = None
+        settings: Optional[FeedSettings] = None,
+        printer_id: Optional[str] = None
     ):
         """Register a new media source."""
         if source_id in self._sources:
@@ -46,7 +49,7 @@ class StreamManager:
             await self.close_source(source_id)
         
         self._sources[source_id] = SourceStream(
-            source_id, track, processor, pc, device_name, settings
+            source_id, track, processor, pc, device_name, settings, printer_id
         )
         logger.info(f"Source {source_id} registered successfully.")
 

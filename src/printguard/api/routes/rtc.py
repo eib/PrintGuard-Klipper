@@ -102,11 +102,22 @@ async def rtc_offer(
             settings.sensitivity = db_printer.inference_sensitivity
             settings.majority_voting = db_printer.inference_majority_voting
             settings.target_fps = db_printer.inference_target_fps
+            settings.detection_action = db_printer.detection_action
 
     sdp = RTCSessionDescription(sdp=offer.sdp, type=offer.type)
     pc, processor = await create_peer_connection(
         sdp, predict, model_info, settings, offer.session_id
     )
+    
+    if offer.printer_id:
+        from .printer import trigger_printer_action
+        
+        async def on_defect(class_name: str, confidence: float):
+            if settings.detection_action and settings.detection_action != "none":
+                await trigger_printer_action(offer.printer_id, settings.detection_action)
+        
+        processor.on_defect = on_defect
+
     if processor.relayed_track:
         await stream_manager.register_source(
             offer.session_id, 
@@ -114,7 +125,8 @@ async def rtc_offer(
             processor,
             pc=pc,
             device_name=offer.device_name,
-            settings=settings
+            settings=settings,
+            printer_id=offer.printer_id
         )
         if offer.printer_id:
             stream_manager.add_alias(offer.session_id, offer.printer_id)

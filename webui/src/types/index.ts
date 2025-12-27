@@ -48,6 +48,7 @@ export interface Printer {
   inference_sensitivity: number
   inference_majority_voting: number
   inference_target_fps: number
+  detection_action: string
 }
 
 export interface PrinterCreate {
@@ -60,6 +61,7 @@ export interface PrinterCreate {
   inference_sensitivity?: number
   inference_majority_voting?: number
   inference_target_fps?: number
+  detection_action?: string
 }
 
 export type PrinterUpdate = Partial<PrinterCreate>

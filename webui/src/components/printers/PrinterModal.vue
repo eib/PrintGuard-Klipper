@@ -5,6 +5,7 @@ import ComponentSelector from '../shared/ComponentSelector.vue'
 import ComponentModal from '../library/ComponentModal.vue'
 import Button from '../ui/Button.vue'
 import Input from '../ui/Input.vue'
+import Select from '../ui/Select.vue'
 import { usePrintersStore } from '../../store/printers'
 import { useComponentsStore } from '../../store/components'
 import type { Printer, PrinterCreate } from '../../types'
@@ -35,7 +36,8 @@ const formData = ref<PrinterCreate>({
   },
   inference_sensitivity: 1.0,
   inference_majority_voting: 1,
-  inference_target_fps: 2.0
+  inference_target_fps: 2.0,
+  detection_action: 'none'
 })
 
 watch([() => props.show, () => props.printer], ([show, printer]) => {
@@ -53,7 +55,8 @@ watch([() => props.show, () => props.printer], ([show, printer]) => {
         },
         inference_sensitivity: printer.inference_sensitivity ?? 1.0,
         inference_majority_voting: printer.inference_majority_voting ?? 1,
-        inference_target_fps: printer.inference_target_fps ?? 2.0
+        inference_target_fps: printer.inference_target_fps ?? 2.0,
+        detection_action: printer.detection_action ?? 'none'
       }
     } else {
       formData.value = {
@@ -65,7 +68,8 @@ watch([() => props.show, () => props.printer], ([show, printer]) => {
         },
         inference_sensitivity: 1.0,
         inference_majority_voting: 1,
-        inference_target_fps: 2.0
+        inference_target_fps: 2.0,
+        detection_action: 'none'
       }
     }
   }
@@ -105,6 +109,12 @@ async function handleSave() {
     loading.value = false
   }
 }
+
+watch(() => formData.value.components.control, (newControl) => {
+  if (!newControl) {
+    formData.value.detection_action = 'none'
+  }
+})
 </script>
 
 <template>
@@ -192,6 +202,27 @@ async function handleSave() {
           placeholder="5.0"
         />
         <small class="field-help">Limit the number of inferences per second</small>
+      </div>
+
+      <div class="form-field">
+        <label for="detection-action">Action on Defect</label>
+        <Select
+          id="detection-action"
+          v-model="formData.detection_action"
+          :disabled="!formData.components.control"
+          :options="[
+            { value: 'none', label: 'None (Notification Only)' },
+            { value: 'pause', label: 'Pause Print' },
+            { value: 'stop', label: 'Stop Print' }
+          ]"
+          full-width
+        />
+        <small class="field-help" v-if="!formData.components.control">
+          Requires a Control Source to be configured.
+        </small>
+        <small class="field-help" v-else>
+          Choose what happens automatically when a defect is detected.
+        </small>
       </div>
 
       <div v-if="error" class="form-error">{{ error }}</div>

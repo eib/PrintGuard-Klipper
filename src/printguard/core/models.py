@@ -14,6 +14,7 @@ class FeedSettings(BaseModel):
     sensitivity: float = 1.0
     majority_voting: int = 1
     target_fps: float = 1000.0
+    detection_action: str = "none"
 
 
 class RTCOffer(BaseModel):
@@ -208,6 +209,7 @@ class PrinterConfig(BaseModel):
     inference_sensitivity: float = 1.0
     inference_majority_voting: int = 1
     inference_target_fps: float = 1000.0
+    detection_action: str = "none"
 
 
 class PrinterInfo(BaseModel):
@@ -222,6 +224,7 @@ class PrinterInfo(BaseModel):
     inference_sensitivity: float = 1.0
     inference_majority_voting: int = 1
     inference_target_fps: float = 1000.0
+    detection_action: str = "none"
 
 
 class ConnectionInfo(BaseModel):
@@ -267,3 +270,4 @@ class PrinterUpdate(BaseModel):
     inference_sensitivity: Optional[float] = None
     inference_majority_voting: Optional[int] = None
     inference_target_fps: Optional[float] = None
+    detection_action: Optional[str] = None

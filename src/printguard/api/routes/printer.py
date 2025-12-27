@@ -87,13 +87,37 @@ async def _get_or_create_printer_instance(printer_id: str, db: AsyncSession) -> 
         client_public_key=db_printer.client_public_key,
         inference_sensitivity=db_printer.inference_sensitivity,
         inference_majority_voting=db_printer.inference_majority_voting,
-        inference_target_fps=db_printer.inference_target_fps
+        inference_target_fps=db_printer.inference_target_fps,
+        detection_action=db_printer.detection_action
     )
     instance = PrinterInstance(config=config)
     for role, db_comp in comp_map.items():
         setattr(instance, role, await _resolve_component(db_comp, db))
     _printers[printer_id] = instance
     return instance
+
+
+async def trigger_printer_action(printer_id: str, action: str):
+    """Trigger an action on a printer."""
+    if action == "none":
+        return
+        
+    from ...core.database import SessionLocal
+    async with SessionLocal() as db:
+        instance = await _get_or_create_printer_instance(printer_id, db)
+        if not instance or not instance.control:
+            logger.warning(f"Cannot trigger action {action} for printer {printer_id}: instance or control not found")
+            return
+            
+        try:
+            if action == "pause":
+                logger.info(f"Auto-pausing printer {printer_id} due to defect")
+                await instance.control.pause()
+            elif action == "stop":
+                logger.info(f"Auto-stopping printer {printer_id} due to defect")
+                await instance.control.stop()
+        except Exception as e:
+            logger.error(f"Failed to trigger auto action {action} for printer {printer_id}: {e}")
 
 
 @router.get("/providers")
@@ -126,7 +150,8 @@ async def register_printer(
         client_public_key=config.client_public_key,
         inference_sensitivity=config.inference_sensitivity,
         inference_majority_voting=config.inference_majority_voting,
-        inference_target_fps=config.inference_target_fps
+        inference_target_fps=config.inference_target_fps,
+        detection_action=config.detection_action
     )
     if config.id:
         db_printer.id = config.id
@@ -194,6 +219,8 @@ async def update_printer(
         db_printer.inference_majority_voting = config.inference_majority_voting
     if config.inference_target_fps is not None:
         db_printer.inference_target_fps = config.inference_target_fps
+    if config.detection_action is not None:
+        db_printer.detection_action = config.detection_action
         
     if config.components is not None:
         for link in db_printer.component_links:
@@ -225,6 +252,7 @@ async def update_printer(
         source.settings.sensitivity = db_printer.inference_sensitivity
         source.settings.majority_voting = db_printer.inference_majority_voting
         source.settings.target_fps = db_printer.inference_target_fps
+        source.settings.detection_action = db_printer.detection_action
         source.processor.settings = source.settings
 
     return await get_printer(printer_id, db, _)
@@ -286,7 +314,8 @@ async def get_printer(
         components=components_info,
         inference_sensitivity=instance.config.inference_sensitivity,
         inference_majority_voting=instance.config.inference_majority_voting,
-        inference_target_fps=instance.config.inference_target_fps
+        inference_target_fps=instance.config.inference_target_fps,
+        detection_action=instance.config.detection_action
     )
 
 
@@ -307,7 +336,8 @@ async def link_printer_stream(
         settings = FeedSettings(
             sensitivity=instance.config.inference_sensitivity,
             majority_voting=instance.config.inference_majority_voting,
-            target_fps=instance.config.inference_target_fps
+            target_fps=instance.config.inference_target_fps,
+            detection_action=instance.config.detection_action
         )
     
     if not instance.camera:
@@ -319,6 +349,7 @@ async def link_printer_stream(
         source.settings.sensitivity = instance.config.inference_sensitivity
         source.settings.majority_voting = instance.config.inference_majority_voting
         source.settings.target_fps = instance.config.inference_target_fps
+        source.settings.detection_action = instance.config.detection_action
         source.processor.settings = source.settings
             
         stream_manager.add_alias(printer_id, session_id)
@@ -330,6 +361,13 @@ async def link_printer_stream(
     
     model_info = get_model()
     processor = await start_track_processing(track, predict, model_info, settings, session_id)
+    
+    from .printer import trigger_printer_action
+    async def on_defect(class_name: str, confidence: float):
+        if settings.detection_action and settings.detection_action != "none":
+            await trigger_printer_action(printer_id, settings.detection_action)
+    processor.on_defect = on_defect
+
     if processor.relayed_track:
         await stream_manager.register_source(
             printer_id, 
@@ -337,7 +375,8 @@ async def link_printer_stream(
             processor,
             pc=pc,
             device_name=f"{instance.config.name} Camera",
-            settings=settings
+            settings=settings,
+            printer_id=printer_id
         )
         stream_manager.add_alias(printer_id, session_id)
     
