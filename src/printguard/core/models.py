@@ -55,6 +55,7 @@ class NotificationSubscriptionRequest(BaseModel):
 class NotificationToggleRequest(BaseModel):
     """Request to toggle notifications for a printer."""
     enabled: bool
+    endpoint: Optional[str] = None
 
 
 class Session(BaseModel):

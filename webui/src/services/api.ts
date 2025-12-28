@@ -65,8 +65,8 @@ export const componentsApi = {
 }
 
 export const printersApi = {
-  list: () => api.get<Printer[]>('/printer'),
-  get: (id: string) => api.get<Printer>(`/printer/${id}`),
+  list: (endpoint?: string) => api.get<Printer[]>('/printer', { params: { endpoint } }),
+  get: (id: string, endpoint?: string) => api.get<Printer>(`/printer/${id}`, { params: { endpoint } }),
   create: (data: PrinterCreate) => api.post<Printer>('/printer', data),
   update: (id: string, data: PrinterUpdate) => api.put<Printer>(`/printer/${id}`, data),
   delete: (id: string) => api.delete(`/printer/${id}`),
@@ -119,7 +119,7 @@ export const notificationsApi = {
   getVapidPublicKey: () => api.get<{ public_key: string }>('/notifications/vapid-public-key'),
   subscribe: (subscription: any) => api.post('/notifications/subscribe', { subscription }),
   unsubscribe: (subscription: any) => api.post('/notifications/unsubscribe', { subscription }),
-  togglePrinter: (printerId: string, enabled: boolean) => api.put(`/notifications/printer/${printerId}`, { enabled }),
+  togglePrinter: (printerId: string, enabled: boolean, endpoint?: string) => api.put(`/notifications/printer/${printerId}`, { enabled, endpoint }),
   test: (printerId: string) => api.post(`/notifications/test/${printerId}`)
 }
 

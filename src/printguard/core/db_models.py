@@ -79,14 +79,15 @@ class PushSubscription(Base):
     auth: Mapped[str] = mapped_column(String(255))
 
     user: Mapped["User"] = relationship()
+    printer_subscriptions: Mapped[list["PrinterNotificationSubscription"]] = relationship(back_populates="push_subscription", cascade="all, delete-orphan")
 
 
 class PrinterNotificationSubscription(Base):
     __tablename__ = "printer_notification_subscriptions"
 
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), primary_key=True)
+    push_subscription_id: Mapped[int] = mapped_column(ForeignKey("push_subscriptions.id"), primary_key=True)
     printer_id: Mapped[str] = mapped_column(ForeignKey("printers.id"), primary_key=True)
 
-    user: Mapped["User"] = relationship()
+    push_subscription: Mapped["PushSubscription"] = relationship(back_populates="printer_subscriptions")
     printer: Mapped["Printer"] = relationship()
 

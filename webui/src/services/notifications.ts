@@ -84,3 +84,11 @@ export async function isSubscribed() {
   return !!subscription
 }
 
+export async function getPushEndpoint() {
+  if (!('serviceWorker' in navigator)) return null
+  const registration = await navigator.serviceWorker.getRegistration()
+  if (!registration) return null
+  const subscription = await registration.pushManager.getSubscription()
+  return subscription?.endpoint || null
+}
+

@@ -66,20 +66,33 @@ async def toggle_printer_notifications(
     if not result.scalar_one_or_none():
         raise HTTPException(status_code=404, detail="Printer not found")
 
+    if not req.endpoint:
+        raise HTTPException(status_code=400, detail="Endpoint required for device-specific notifications")
+
+    result = await db.execute(
+        select(PushSubscription).where(
+            PushSubscription.user_id == user.id,
+            PushSubscription.endpoint == req.endpoint
+        )
+    )
+    push_sub = result.scalar_one_or_none()
+    if not push_sub:
+        raise HTTPException(status_code=404, detail="Device push subscription not found. Please subscribe this device first.")
+
     if req.enabled:
         result = await db.execute(
             select(PrinterNotificationSubscription).where(
-                PrinterNotificationSubscription.user_id == user.id,
+                PrinterNotificationSubscription.push_subscription_id == push_sub.id,
                 PrinterNotificationSubscription.printer_id == printer_id
             )
         )
         if not result.scalar_one_or_none():
-            sub = PrinterNotificationSubscription(user_id=user.id, printer_id=printer_id)
+            sub = PrinterNotificationSubscription(push_subscription_id=push_sub.id, printer_id=printer_id)
             db.add(sub)
     else:
         await db.execute(
             delete(PrinterNotificationSubscription).where(
-                PrinterNotificationSubscription.user_id == user.id,
+                PrinterNotificationSubscription.push_subscription_id == push_sub.id,
                 PrinterNotificationSubscription.printer_id == printer_id
             )
         )

@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { printersApi, notificationsApi } from '../services/api'
+import { getPushEndpoint } from '../services/notifications'
 import type { Printer, PrinterCreate, PrinterUpdate } from '../types'
 
 export const usePrintersStore = defineStore('printers', () => {
@@ -12,7 +13,8 @@ export const usePrintersStore = defineStore('printers', () => {
     loading.value = true
     error.value = null
     try {
-      const response = await printersApi.list()
+      const endpoint = await getPushEndpoint()
+      const response = await printersApi.list(endpoint || undefined)
       printers.value = response.data
     } catch (e: any) {
       error.value = e.response?.data?.detail || 'Failed to fetch printers'
@@ -45,7 +47,8 @@ export const usePrintersStore = defineStore('printers', () => {
   async function sendCommand(id: string, cmd: string) {
     await printersApi.command(id, cmd)
     // Refresh the printer status
-    const response = await printersApi.get(id)
+    const endpoint = await getPushEndpoint()
+    const response = await printersApi.get(id, endpoint || undefined)
     const index = printers.value.findIndex(p => p.id === id)
     if (index !== -1) {
       printers.value[index] = response.data
@@ -53,7 +56,8 @@ export const usePrintersStore = defineStore('printers', () => {
   }
 
   async function toggleNotifications(id: string, enabled: boolean) {
-    await notificationsApi.togglePrinter(id, enabled)
+    const endpoint = await getPushEndpoint()
+    await notificationsApi.togglePrinter(id, enabled, endpoint || undefined)
     const index = printers.value.findIndex(p => p.id === id)
     if (index !== -1) {
       printers.value[index].notifications_enabled = enabled

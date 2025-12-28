@@ -58,33 +58,10 @@ async def _notify_defect_async(session_id: str, defect_class: str, confidence: f
 
     async with SessionLocal() as db:
         result = await db.execute(
-            select(PrinterNotificationSubscription.user_id).where(
-                PrinterNotificationSubscription.printer_id == printer_id
-            )
-        )
-        user_ids = [row[0] for row in result.all()]
-        
-        if not user_ids:
-            logger.info(f"No users subscribed to notifications for printer {printer_id}")
-            if session_id != printer_id:
-                result = await db.execute(
-                    select(PrinterNotificationSubscription.user_id).where(
-                        PrinterNotificationSubscription.printer_id == session_id
-                    )
-                )
-                user_ids = [row[0] for row in result.all()]
-                if user_ids:
-                    logger.info(f"Found users subscribed via session_id {session_id} instead of printer_id {printer_id}")
-                else:
-                    return
-            else:
-                return
-
-        logger.info(f"Subscribed users for printer {printer_id}: {user_ids}")
-
-        result = await db.execute(
-            select(PushSubscription).where(
-                PushSubscription.user_id.in_(user_ids),
+            select(PushSubscription)
+            .join(PrinterNotificationSubscription)
+            .where(
+                PrinterNotificationSubscription.printer_id == printer_id,
                 PushSubscription.endpoint.is_not(None),
                 PushSubscription.p256dh.is_not(None),
                 PushSubscription.auth.is_not(None)
@@ -92,18 +69,24 @@ async def _notify_defect_async(session_id: str, defect_class: str, confidence: f
         )
         subscriptions = result.scalars().all()
         
-        if not subscriptions:
-            all_subs_result = await db.execute(
-                select(PushSubscription).where(PushSubscription.user_id.in_(user_ids))
+        if not subscriptions and session_id != printer_id:
+            result = await db.execute(
+                select(PushSubscription)
+                .join(PrinterNotificationSubscription)
+                .where(
+                    PrinterNotificationSubscription.printer_id == session_id,
+                    PushSubscription.endpoint.is_not(None),
+                    PushSubscription.p256dh.is_not(None),
+                    PushSubscription.auth.is_not(None)
+                )
             )
-            all_subs = all_subs_result.scalars().all()
-            if all_subs:
-                logger.warning(f"Found {len(all_subs)} push subscriptions for users {user_ids}, but they are missing keys or endpoint.")
-            else:
-                logger.info(f"No active device subscriptions found for users {user_ids} of printer {printer_id}")
+            subscriptions = result.scalars().all()
+
+        if not subscriptions:
+            logger.info(f"No active device subscriptions found for printer {printer_id}")
             return
 
-        logger.info(f"Found {len(subscriptions)} active device subscriptions for users {user_ids}")
+        logger.info(f"Found {len(subscriptions)} active device subscriptions for printer {printer_id}")
 
         image_url = None
         base_url = settings.last_known_public_base_url or ""
