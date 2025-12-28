@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useAuthStore } from '../store/auth'
 import TunnelConfig from '../components/settings/TunnelConfig.vue'
+import ScreenshotSettings from '../components/settings/ScreenshotSettings.vue'
 import UserList from '../components/settings/UserList.vue'
 import M2MList from '../components/settings/M2MList.vue'
 
@@ -23,6 +24,11 @@ const auth = useAuthStore()
       </section>
 
       <template v-if="auth.isAdmin">
+        <section :class="$style.section">
+          <h2>Screenshot Management</h2>
+          <ScreenshotSettings />
+        </section>
+
         <section :class="$style.section">
           <h2>User Management</h2>
           <UserList />

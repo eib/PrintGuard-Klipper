@@ -64,6 +64,11 @@ class Settings(BaseSettings):
     # Database Settings
     database_url: str = "sqlite+aiosqlite:///./printguard.db"
 
+    # Screenshot Settings
+    screenshot_retention_hours: int = 24
+    screenshot_max_count: int = 100
+    screenshot_cleanup_interval_minutes: int = 60
+
     # Dynamic States (Not persisted to .env)
     last_known_public_base_url: str = ""
 

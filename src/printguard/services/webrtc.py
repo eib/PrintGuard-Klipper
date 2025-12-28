@@ -13,6 +13,7 @@ from av import VideoFrame
 from PIL import ImageEnhance
 
 from .notifications import notify_defect
+from .storage import screenshot_manager
 from ..core.models import FeedSettings, PredictionResult, PredictionStatus, PredictionClass
 
 logger = logging.getLogger(__name__)
@@ -200,11 +201,15 @@ class VideoProcessor:
                                 try:
                                     import os
                                     from datetime import datetime
-                                    os.makedirs("screenshots", exist_ok=True)
+                                    from io import BytesIO
                                     filename = f"defect_{self.session_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg"
-                                    screenshot_path = os.path.join("screenshots", filename)
-                                    frame.to_image().save(screenshot_path)
-                                    logger.info(f"Saved defect screenshot to {screenshot_path}")
+                                    
+                                    buf = BytesIO()
+                                    frame.to_image().save(buf, format="JPEG")
+                                    screenshot_manager.add(filename, buf.getvalue())
+                                    
+                                    screenshot_path = filename
+                                    logger.info(f"Saved defect screenshot to memory: {filename}")
                                 except Exception as e:
                                     logger.error(f"Failed to save defect screenshot: {e}")
 

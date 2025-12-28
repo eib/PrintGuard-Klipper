@@ -4,9 +4,9 @@ import asyncio
 import logging
 
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 import os
 
@@ -16,6 +16,7 @@ from .core.database import init_db
 from .api.routes import router
 from .services.webrtc import cleanup
 from .services.tunnels import setup_active_tunnel
+from .services.storage import screenshot_manager
 
 # Configure logging
 logging.basicConfig(
@@ -40,8 +41,31 @@ async def lifespan(app: FastAPI):
     # Setup tunnel (only one will be activated)
     await setup_active_tunnel(app, settings)
 
+    # Initial screenshot cleanup
+    screenshot_manager.cleanup()
+
+    # Background cleanup task
+    async def periodic_cleanup():
+        while True:
+            settings = get_settings()
+            await asyncio.sleep(settings.screenshot_cleanup_interval_minutes * 60)
+            logger.info("Running periodic screenshot cleanup...")
+            screenshot_manager.cleanup()
+
+    cleanup_task = asyncio.create_task(periodic_cleanup())
+
     yield
     
+    # Cancel background task
+    cleanup_task.cancel()
+    try:
+        await cleanup_task
+    except asyncio.CancelledError:
+        pass
+
+    # Final cleanup on exit
+    screenshot_manager.cleanup()
+
     # Cleanup tunnel process if it exists
     if hasattr(app.state, "tunnel_process"):
         process = app.state.tunnel_process
@@ -69,10 +93,15 @@ webui_dist = os.path.join(os.getcwd(), "webui", "dist")
 if os.path.exists(webui_dist):
     app.mount("/", StaticFiles(directory=webui_dist, html=True), name="webui")
 
-screenshots_dir = os.path.join(os.getcwd(), "screenshots")
-os.makedirs(screenshots_dir, exist_ok=True)
-app.mount("/screenshots", StaticFiles(directory=screenshots_dir), name="screenshots")
-
+@app.get("/screenshots/{filename}")
+async def get_screenshot(filename: str):
+    """Serve a screenshot from memory or an expired placeholder."""
+    data = screenshot_manager.get(filename)
+    if data:
+        return Response(content=data, media_type="image/jpeg")
+    # Serve placeholder for expired screenshots
+    placeholder_io = screenshot_manager.get_expired_placeholder()
+    return Response(content=placeholder_io.getvalue(), media_type="image/jpeg")
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request, exc):

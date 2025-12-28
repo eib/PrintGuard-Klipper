@@ -92,7 +92,9 @@ export const adminApi = {
   createUser: (data: any) => api.post<User>('/admin/users', data),
   listM2M: () => api.get<M2MApplication[]>('/admin/m2m'),
   deleteM2M: (clientId: string) => api.delete(`/admin/m2m/${clientId}`),
-  createM2M: (data: any) => api.post<M2MApplication>('/admin/m2m', data)
+  createM2M: (data: any) => api.post<M2MApplication>('/admin/m2m', data),
+  getSettings: () => api.get('/admin/settings'),
+  updateSettings: (data: any) => api.post('/admin/settings', data)
 }
 
 export const tunnelApi = {

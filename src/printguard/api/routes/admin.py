@@ -8,10 +8,16 @@ import logging
 from ...core.database import get_db
 from ...core.db_models import User, M2MApplication
 from ...core.hashing import get_password_hash
-from ...core.utils import generate_random_string
+from ...core.utils import generate_random_string, update_env_file
+from ...core.config import get_settings
 from ..auth_utils import get_current_identity
 
 router = APIRouter(prefix="/admin", tags=["admin"])
+
+class SystemSettings(BaseModel):
+    screenshot_retention_hours: int
+    screenshot_max_count: int
+    screenshot_cleanup_interval_minutes: int
 
 class M2MCreateRequest(BaseModel):
     name: str = Field(..., min_length=1, max_length=100)
@@ -142,4 +148,31 @@ async def delete_m2m_application(
     await db.delete(m2m)
     await db.commit()
     return {"status": "success"}
+
+@router.get("/settings", response_model=SystemSettings)
+async def get_system_settings(admin: any = Security(get_current_identity, scopes=["admin"])):
+    """Get system-wide settings."""
+    settings = get_settings()
+    return SystemSettings(
+        screenshot_retention_hours=settings.screenshot_retention_hours,
+        screenshot_max_count=settings.screenshot_max_count,
+        screenshot_cleanup_interval_minutes=settings.screenshot_cleanup_interval_minutes
+    )
+
+@router.post("/settings", response_model=SystemSettings)
+async def update_system_settings(
+    new_settings: SystemSettings,
+    admin: any = Security(get_current_identity, scopes=["admin"])
+):
+    """Update and persist system-wide settings."""
+    settings = get_settings()
+    settings.screenshot_retention_hours = new_settings.screenshot_retention_hours
+    settings.screenshot_max_count = new_settings.screenshot_max_count
+    settings.screenshot_cleanup_interval_minutes = new_settings.screenshot_cleanup_interval_minutes
+    update_env_file({
+        "SCREENSHOT_RETENTION_HOURS": str(new_settings.screenshot_retention_hours),
+        "SCREENSHOT_MAX_COUNT": str(new_settings.screenshot_max_count),
+        "SCREENSHOT_CLEANUP_INTERVAL_MINUTES": str(new_settings.screenshot_cleanup_interval_minutes)
+    })
+    return new_settings
 
