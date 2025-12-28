@@ -93,6 +93,15 @@ class PredictionClass(str, Enum):
     DEFECT = "defect"
 
 
+class TimelineEntry(BaseModel):
+    """Single timeline entry."""
+    timestamp: float
+    class_name: str
+    confidence: float
+    defect_confidence: float
+    class_idx: Optional[int] = None
+
+
 class PredictionResult(BaseModel):
     """Prediction result for a frame."""
     class_name: Optional[PredictionClass | str] = None
@@ -102,6 +111,7 @@ class PredictionResult(BaseModel):
     status: PredictionStatus = PredictionStatus.SUCCESS
     actual_fps: Optional[float] = None
     inference_paused: bool = False
+    timeline_results: Optional[list[TimelineEntry]] = None
 
 
 class CFAccount(BaseModel):

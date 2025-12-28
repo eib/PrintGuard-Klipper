@@ -162,13 +162,24 @@ async def rtc_result(session_id: str, _: any = Security(get_current_identity, sc
     source = stream_manager.get_source(session_id)
     if not source or not source.processor:
         return PredictionResult(status=PredictionStatus.WAITING, inference_paused=True)
-    
+
     paused = getattr(source.processor, "pause_inference", False)
     result = source.processor.last_result
+    timeline = source.processor.get_timeline_results()
+
     if result:
-        return PredictionResult(**result, status=PredictionStatus.SUCCESS, inference_paused=paused)
-    
-    return PredictionResult(status=PredictionStatus.WAITING, inference_paused=paused)
+        return PredictionResult(
+            **result,
+            status=PredictionStatus.SUCCESS,
+            inference_paused=paused,
+            timeline_results=timeline
+        )
+
+    return PredictionResult(
+        status=PredictionStatus.WAITING,
+        inference_paused=paused,
+        timeline_results=timeline
+    )
 
 
 @router.delete("/{session_id}")

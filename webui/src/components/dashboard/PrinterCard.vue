@@ -1,13 +1,14 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import LiveFeed from './LiveFeed.vue'
+import InferenceTimeline from './InferenceTimeline.vue'
 import { usePrintersStore } from '../../store/printers'
 import { streamsApi, notificationsApi } from '../../services/api'
 import { subscribeUserToPush } from '../../services/notifications'
 import IconButton from '../ui/IconButton.vue'
 import Button from '../ui/Button.vue'
 import Badge from '../ui/Badge.vue'
-import { Play, Pause, Square, Settings, Trash2, Zap, ZapOff, Bell } from 'lucide-vue-next'
+import { Play, Pause, Square, Settings, Trash2, Zap, ZapOff, Bell, ChevronDown, ChevronUp } from 'lucide-vue-next'
 import type { Printer } from '../../types'
 
 const props = defineProps<{
@@ -20,7 +21,13 @@ const emit = defineEmits<{
 
 const store = usePrintersStore()
 const prediction = ref<any>(null)
+const showTimeline = ref(false)
 let pollTimer: any = null
+
+const threshold = computed(() => {
+  const sensitivity = props.printer.inference_sensitivity || 1.0
+  return 50 / sensitivity
+})
 
 async function pollResults() {
   try {
@@ -102,7 +109,7 @@ async function sendTestNotification() {
           <h3 :class="$style.name">{{ printer.name }}</h3>
           <IconButton
             :variant="printer.notifications_enabled ? 'primary' : 'ghost'"
-            size="xs"
+            size="sm"
             :class="$style.inlineBell"
             :title="printer.notifications_enabled ? 'Disable notifications' : 'Enable notifications'"
             @click.stop="toggleNotifications"
@@ -139,6 +146,12 @@ async function sendTestNotification() {
 
     <div :class="$style.feedWrapper">
       <LiveFeed :printerId="printer.id" :camera="printer.components?.camera" />
+      <div v-if="showTimeline" :class="$style.timelineOverlay">
+        <InferenceTimeline
+          :timelineResults="prediction?.timeline_results"
+          :threshold="threshold"
+        />
+      </div>
     </div>
 
     <div :class="$style.footer">
@@ -185,6 +198,15 @@ async function sendTestNotification() {
       </div>
 
       <div :class="$style.cardActions">
+        <IconButton
+          variant="ghost"
+          size="sm"
+          title="Toggle Timeline"
+          @click="showTimeline = !showTimeline"
+        >
+          <ChevronDown v-if="!showTimeline" :size="16" />
+          <ChevronUp v-else :size="16" />
+        </IconButton>
         <IconButton
           variant="ghost"
           size="sm"
@@ -350,6 +372,18 @@ async function sendTestNotification() {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  position: relative;
+}
+
+.timelineOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.9);
+  z-index: 10;
+  padding: var(--space-4);
 }
 
 .footer {

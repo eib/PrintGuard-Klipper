@@ -73,6 +73,14 @@ export interface HealthStatus {
   error?: string
 }
 
+export interface TimelineEntry {
+  timestamp: number
+  class_name: string
+  confidence: number
+  defect_confidence: number
+  class_idx?: number
+}
+
 export interface PredictionResult {
   class_name?: string
   class_idx?: number
@@ -80,6 +88,7 @@ export interface PredictionResult {
   distances?: Record<string, number>
   status: 'success' | 'waiting' | 'error'
   actual_fps?: number
+  timeline_results?: TimelineEntry[]
 }
 
 export interface ProviderField {

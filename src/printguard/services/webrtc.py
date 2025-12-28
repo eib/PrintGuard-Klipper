@@ -39,6 +39,7 @@ class VideoProcessor:
         self._just_resumed = True
         self._last_notified_class: str | None = None
         self._results_buffer = deque(maxlen=50)
+        self._timeline_buffer = deque(maxlen=200)
         self._inference_times = deque(maxlen=10)
         self._last_inference_time = 0
         self.on_defect: Optional[Callable[[str, float], None]] = None
@@ -137,6 +138,21 @@ class VideoProcessor:
             
             if result:
                 self._results_buffer.append(result.get("class_name"))
+                probs = result.get("probabilities", {})
+                defect_conf = probs.get("defect", 0.0)
+                if not defect_conf and "defect_idx" in self.model_info:
+                    idx = self.model_info["defect_idx"]
+                    class_names = self.model_info.get("class_names", [])
+                    if 0 <= idx < len(class_names):
+                        defect_conf = probs.get(class_names[idx], 0.0)
+
+                self._timeline_buffer.append({
+                    "timestamp": self._last_inference_time,
+                    "class_name": result.get("class_name"),
+                    "confidence": result.get("confidence"),
+                    "defect_confidence": defect_conf,
+                    "class_idx": result.get("class_idx")
+                })
                 
                 actual_fps = 0.0
                 if len(self._inference_times) > 1:
@@ -203,6 +219,10 @@ class VideoProcessor:
                     elif class_name == PredictionClass.NORMAL:
                         self._last_notified_class = None
                         self._just_resumed = False
+
+    def get_timeline_results(self) -> list[dict]:
+        """Get stored timeline results."""
+        return list(self._timeline_buffer)
     
     async def process(self, track):
         """Process incoming video track with two concurrent tasks."""
