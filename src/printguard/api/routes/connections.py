@@ -1,6 +1,6 @@
 import logging
-from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Security, status
+from typing import List, Optional, Annotated
+from fastapi import APIRouter, Depends, HTTPException, Security, status, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -17,9 +17,9 @@ router = APIRouter(prefix="/connections", tags=["connections"], route_class=Encr
 
 @router.get("", response_model=List[ConnectionInfo])
 async def list_connections(
-    provider: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
-    _: any = Security(get_current_identity, scopes=["printer:read"])
+    _: any = Security(get_current_identity, scopes=["printer:read"]),
+    provider: Annotated[Optional[str], Query()] = None
 ):
     """List all connections."""
     stmt = select(Connection)
@@ -160,9 +160,9 @@ async def list_connection_components(
 @router.get("/{id}/entities")
 async def list_connection_entities(
     id: str,
-    type: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
-    _: any = Security(get_current_identity, scopes=["printer:read"])
+    _: any = Security(get_current_identity, scopes=["printer:read"]),
+    type: Annotated[Optional[str], Query()] = None
 ):
     """Fetch available entities from provider."""
     result = await db.execute(select(Connection).where(Connection.id == id))

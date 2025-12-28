@@ -1,76 +1,57 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { componentsApi } from '../services/api'
+import { useCrudStore } from '../composables/useCrudStore'
 import type { Component, ComponentCreate, ComponentUpdate } from '../types'
 
 export const useComponentsStore = defineStore('components', () => {
-  const components = ref<Component[]>([])
+  const crud = useCrudStore<Component, ComponentCreate, ComponentUpdate>(
+    componentsApi
+  )
   const componentRegistry = ref<Record<string, Component>>({})
-  const loading = ref(false)
-  const error = ref<string | null>(null)
   const filters = ref<any>({})
 
   async function fetchAll(newFilters?: any, replace = false) {
     if (newFilters) {
-      if (replace) {
-        filters.value = { ...newFilters }
-      } else {
-        filters.value = { ...filters.value, ...newFilters }
-      }
+      filters.value = replace ? { ...newFilters } : { ...filters.value, ...newFilters }
     } else if (replace) {
       filters.value = {}
     }
-
-    loading.value = true
-    error.value = null
-    try {
-      const response = await componentsApi.list(filters.value)
-      components.value = response.data
-
-      response.data.forEach(comp => {
-        componentRegistry.value[comp.id] = comp
-      })
-    } catch (e: any) {
-      error.value = e.response?.data?.detail || 'Failed to fetch components'
-      console.error(e)
-    } finally {
-      loading.value = false
-    }
+    
+    await crud.fetchAll(filters.value)
+    
+    crud.items.value.forEach(comp => {
+      componentRegistry.value[comp.id] = comp
+    })
   }
 
   async function create(data: ComponentCreate) {
-    const response = await componentsApi.create(data)
-    components.value.push(response.data)
-    componentRegistry.value[response.data.id] = response.data
-    return response.data
+    const result = await crud.create(data)
+    componentRegistry.value[result.id] = result
+    return result
   }
 
   async function update(id: string, data: ComponentUpdate) {
-    const response = await componentsApi.update(id, data)
-    const index = components.value.findIndex(c => c.id === id)
-    if (index !== -1) {
-      components.value[index] = response.data
-    }
-    componentRegistry.value[id] = response.data
-    return response.data
+    const result = await crud.update(id, data)
+    componentRegistry.value[id] = result
+    return result
   }
 
   async function remove(id: string, force = false) {
     await componentsApi.delete(id, force)
-    components.value = components.value.filter(c => c.id !== id)
+    crud.items.value = crud.items.value.filter(c => c.id !== id)
     delete componentRegistry.value[id]
   }
 
   return {
-    components,
+    components: crud.items,
     componentRegistry,
-    loading,
+    loading: crud.loading,
     filters,
-    error,
+    error: crud.error,
     fetchAll,
     create,
     update,
     remove
   }
 })
-

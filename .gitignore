@@ -4,7 +4,6 @@ success
 failure
 build
 *.egg-info
-!.github
 /models
 *.pte
 model/
@@ -18,3 +17,4 @@ webui/node_modules/
 webui/dist/
 .env
 screenshots/
+!.github

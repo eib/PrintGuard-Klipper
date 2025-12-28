@@ -142,7 +142,7 @@ const chartOptions = computed(() => ({
           if (context.parsed.y !== null) {
             return `${context.dataset.label}: ${context.parsed.y.toFixed(1)}%`
           }
-          return null
+          return ''
         }
       }
     }
@@ -174,7 +174,7 @@ const chartOptions = computed(() => ({
       ticks: {
         color: 'rgb(255, 255, 255)',
         callback: function(value: any) {
-          if (value > 100) return null
+          if (value > 100) return ''
           return `${value}%`
         },
         font: {

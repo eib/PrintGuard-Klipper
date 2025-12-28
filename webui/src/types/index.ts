@@ -8,6 +8,13 @@ export interface Connection {
 export type ConnectionCreate = Omit<Connection, 'id'>
 export type ConnectionUpdate = Partial<ConnectionCreate>
 
+export interface Entity {
+  id: string
+  name: string
+  type: string
+  config: Record<string, any>
+}
+
 export interface Component {
   id: string
   name: string
@@ -57,13 +64,13 @@ export interface PrinterCreate {
   name: string
   components: {
     camera: string
-    status?: string | null
-    control?: string | null
+    status: string | null
+    control: string | null
   }
-  inference_sensitivity?: number
-  inference_majority_voting?: number
-  inference_target_fps?: number
-  detection_action?: string
+  inference_sensitivity: number
+  inference_majority_voting: number
+  inference_target_fps: number
+  detection_action: string
 }
 
 export type PrinterUpdate = Partial<PrinterCreate>

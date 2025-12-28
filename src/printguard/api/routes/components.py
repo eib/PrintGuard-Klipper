@@ -1,18 +1,19 @@
 import logging
-from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Security, status, Query
+from typing import List, Optional, Annotated
+from fastapi import APIRouter, Depends, HTTPException, Security, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from ...core.database import get_db
-from ...core.db_models import Component, Connection, PrinterComponentLink
+from ...core.db_models import Component, PrinterComponentLink
 from ...core.models import ComponentCreate, ComponentUpdate, ComponentInfo, FeedSettings
 from ...core.model import get_model
 from ...core.inference import predict
 from ...providers import get_provider
 from ...services.webrtc import start_track_processing
 from ...services.streams import stream_manager
+from ...services.component_resolver import build_component_config
 from ..auth_utils import get_current_identity
 from ..crypto_utils import EncryptedRoute
 
@@ -21,11 +22,11 @@ router = APIRouter(prefix="/components", tags=["components"], route_class=Encryp
 
 @router.get("", response_model=List[ComponentInfo])
 async def list_components(
-    type: Optional[str] = None,
-    provider: Optional[str] = None,
-    connection_id: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
-    _: any = Security(get_current_identity, scopes=["printer:read"])
+    _: any = Security(get_current_identity, scopes=["printer:read"]),
+    type: Annotated[Optional[str], Query()] = None,
+    provider: Annotated[Optional[str], Query()] = None,
+    connection_id: Annotated[Optional[str], Query()] = None
 ):
     """List all components."""
     stmt = select(Component).options(selectinload(Component.connection))
@@ -168,10 +169,7 @@ async def check_component_health(
     if not prov_cls:
         raise HTTPException(status_code=400, detail="Provider not found")
     
-    config = {}
-    if component.connection:
-        config.update(component.connection.config)
-    config.update(component.entity_config or {})
+    config = build_component_config(component)
     
     is_healthy = await prov_cls.validate_component(config)
     return {"healthy": is_healthy}
@@ -212,10 +210,7 @@ async def link_component_stream(
     if not prov_cls:
         raise HTTPException(status_code=400, detail=f"Provider {db_comp.provider} not found")
     
-    config = {}
-    if db_comp.connection:
-        config.update(db_comp.connection.config)
-    config.update(db_comp.entity_config)
+    config = build_component_config(db_comp)
     
     instance = prov_cls(**config)
     track, pc = await instance.get_camera_track()

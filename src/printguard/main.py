@@ -15,7 +15,7 @@ from .core.model import download_model, load_model
 from .core.database import init_db
 from .api.routes import router
 from .services.webrtc import cleanup
-from .services.tunnels import setup_active_tunnel
+from .services.tunnel_manager import setup_active_tunnel
 from .services.storage import screenshot_manager
 
 # Configure logging

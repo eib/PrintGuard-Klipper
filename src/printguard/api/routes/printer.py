@@ -1,7 +1,7 @@
 """Printer control endpoints."""
 
 import logging
-from typing import Any, Optional, Union
+from typing import Optional, Annotated
 from pydantic import BaseModel
 from fastapi import APIRouter, HTTPException, Security, Depends, Query
 from sqlalchemy import select
@@ -19,6 +19,9 @@ from ...providers import list_providers as get_available_providers, get_provider
 from ...providers.base import StatusSource, CameraSource, ControlSink
 from ...services.webrtc import start_track_processing
 from ...services.streams import stream_manager
+from ...services.component_resolver import resolve_component
+from ...services.defect_handler import handle_defect
+from ...services.settings_sync import sync_stream_settings
 from ..crypto_utils import EncryptedRoute
 from ..auth_utils import get_current_identity
 
@@ -37,32 +40,6 @@ class PrinterInstance(BaseModel):
 
 
 _printers: dict[str, PrinterInstance] = {}
-
-
-async def _resolve_component(comp: Component, db: AsyncSession) -> Any:
-    """Instantiate a provider component from DB model."""
-    provider = comp.provider
-    config = {}
-    if comp.connection_id:
-        if not comp.connection:
-            from ...core.db_models import Connection
-            res = await db.execute(select(Connection).where(Connection.id == comp.connection_id))
-            comp.connection = res.scalar_one_or_none()
-            
-        if comp.connection:
-            config.update(comp.connection.config)
-            
-    config.update(comp.entity_config or {})
-
-    prov_cls = get_provider(provider)
-    if not prov_cls:
-        logger.warning(f"Provider class not found for: {provider}")
-        return None
-    try:
-        return prov_cls(**config)
-    except Exception as e:
-        logger.error(f"Failed to instantiate provider {provider} with config {config}: {e}")
-        return None
 
 
 async def _get_or_create_printer_instance(printer_id: str, db: AsyncSession) -> Optional[PrinterInstance]:
@@ -93,32 +70,9 @@ async def _get_or_create_printer_instance(printer_id: str, db: AsyncSession) -> 
     )
     instance = PrinterInstance(config=config)
     for role, db_comp in comp_map.items():
-        setattr(instance, role, await _resolve_component(db_comp, db))
+        setattr(instance, role, await resolve_component(db_comp, db))
     _printers[printer_id] = instance
     return instance
-
-
-async def trigger_printer_action(printer_id: str, action: str):
-    """Trigger an action on a printer."""
-    if action == "none":
-        return
-        
-    from ...core.database import async_session as SessionLocal
-    async with SessionLocal() as db:
-        instance = await _get_or_create_printer_instance(printer_id, db)
-        if not instance or not instance.control:
-            logger.warning(f"Cannot trigger action {action} for printer {printer_id}: instance or control not found")
-            return
-            
-        try:
-            if action == "pause":
-                logger.info(f"Auto-pausing printer {printer_id} due to defect")
-                await instance.control.pause()
-            elif action == "stop":
-                logger.info(f"Auto-stopping printer {printer_id} due to defect")
-                await instance.control.stop()
-        except Exception as e:
-            logger.error(f"Failed to trigger auto action {action} for printer {printer_id}: {e}")
 
 
 @router.get("/providers")
@@ -247,23 +201,22 @@ async def update_printer(
     if printer_id in _printers:
         _printers.pop(printer_id)
 
-    source = stream_manager.get_source(printer_id)
-    if source:
-        logger.info(f"Updating active stream for printer {printer_id} with target_fps {db_printer.inference_target_fps}")
-        source.settings.sensitivity = db_printer.inference_sensitivity
-        source.settings.majority_voting = db_printer.inference_majority_voting
-        source.settings.target_fps = db_printer.inference_target_fps
-        source.settings.detection_action = db_printer.detection_action
-        source.processor.settings = source.settings
+    sync_stream_settings(
+        printer_id,
+        db_printer.inference_sensitivity,
+        db_printer.inference_majority_voting,
+        db_printer.inference_target_fps,
+        db_printer.detection_action
+    )
 
     return await get_printer(printer_id, db, user)
 
 
 @router.get("", response_model=list[PrinterInfo])
 async def list_printers(
-    endpoint: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
-    user: any = Security(get_current_identity, scopes=["printer:read"])
+    user: any = Security(get_current_identity, scopes=["printer:read"]),
+    endpoint: Annotated[Optional[str], Query()] = None
 ) -> list[PrinterInfo]:
     """List all registered printers."""
     result = await db.execute(select(Printer.id))
@@ -276,7 +229,7 @@ async def get_printer(
     printer_id: str, 
     db: AsyncSession = Depends(get_db),
     user: any = Security(get_current_identity, scopes=["printer:read"]),
-    endpoint: Optional[str] = Query(None)
+    endpoint: Annotated[Optional[str], Query()] = None
 ) -> PrinterInfo:
     """Get printer status."""
     instance = await _get_or_create_printer_instance(printer_id, db)
@@ -369,12 +322,13 @@ async def link_printer_stream(
     
     source = stream_manager.get_source(printer_id)
     if source:
-        logger.info(f"Syncing settings for existing stream {printer_id}: sensitivity={instance.config.inference_sensitivity}, target_fps={instance.config.inference_target_fps}")
-        source.settings.sensitivity = instance.config.inference_sensitivity
-        source.settings.majority_voting = instance.config.inference_majority_voting
-        source.settings.target_fps = instance.config.inference_target_fps
-        source.settings.detection_action = instance.config.detection_action
-        source.processor.settings = source.settings
+        sync_stream_settings(
+            printer_id,
+            instance.config.inference_sensitivity,
+            instance.config.inference_majority_voting,
+            instance.config.inference_target_fps,
+            instance.config.detection_action
+        )
             
         stream_manager.add_alias(printer_id, session_id)
         return {"status": "success", "session_id": session_id, "multiplexed": True}
@@ -401,23 +355,19 @@ async def link_printer_stream(
         
         raise HTTPException(status_code=404, detail="Camera track not available")
     
+    from ...services.notifications import notify_user_camera_access
     model_info = get_model()
     processor = await start_track_processing(track, predict, model_info, settings, session_id)
     
-    from .printer import trigger_printer_action
-    from ...services.notifications import notify_defect
     async def on_defect(class_name: str, confidence: float, screenshot_path: str = None):
-        if settings.detection_action and settings.detection_action != "none":
-            await trigger_printer_action(printer_id, settings.detection_action)
-        from ...core.database import async_session as SessionLocal
-        async with SessionLocal() as db_session:
-            res = await db_session.execute(select(Printer).where(Printer.id == printer_id))
-            db_p = res.scalar_one_or_none()
-            if db_p:
-                db_p.inference_paused = True
-                await db_session.commit()
-        
-        notify_defect(printer_id, class_name, confidence, screenshot_path)
+        await handle_defect(
+            printer_id=printer_id,
+            session_id=session_id,
+            class_name=class_name,
+            confidence=confidence,
+            screenshot_path=screenshot_path,
+            detection_action=settings.detection_action
+        )
     
     processor.on_defect = on_defect
 

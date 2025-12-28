@@ -14,6 +14,7 @@ from ...core.models import (
 )
 from ...services.webrtc import create_peer_connection, create_viewer_connection
 from ...services.streams import stream_manager
+from ...services.defect_handler import handle_defect
 from ..crypto_utils import EncryptedRoute
 from ..auth_utils import get_current_identity
 
@@ -110,22 +111,15 @@ async def rtc_offer(
     )
     
     if offer.printer_id:
-        from .printer import trigger_printer_action
-        from ...services.notifications import notify_defect
-        
         async def on_defect(class_name: str, confidence: float, screenshot_path: str = None):
-            if settings.detection_action and settings.detection_action != "none":
-                await trigger_printer_action(offer.printer_id, settings.detection_action)
-            
-            from ...core.database import async_session as SessionLocal
-            async with SessionLocal() as db_session:
-                res = await db_session.execute(select(Printer).where(Printer.id == offer.printer_id))
-                db_p = res.scalar_one_or_none()
-                if db_p:
-                    db_p.inference_paused = True
-                    await db_session.commit()
-            
-            notify_defect(offer.session_id, class_name, confidence, screenshot_path)
+            await handle_defect(
+                printer_id=offer.printer_id,
+                session_id=offer.session_id,
+                class_name=class_name,
+                confidence=confidence,
+                screenshot_path=screenshot_path,
+                detection_action=settings.detection_action
+            )
         
         processor.on_defect = on_defect
 

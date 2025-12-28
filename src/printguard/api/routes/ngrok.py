@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Security, Request
 from ...core.models import NgrokTunnelRequest, NgrokTunnelResponse
-from ...services.ngrok import setup_ngrok_tunnel
-from ...services.tunnels import stop_active_tunnel
+from ...services.tunnel_manager import setup_ngrok_tunnel, stop_active_tunnel
 from ...core.config import get_settings, TunnelProvider
 from ...core.utils import update_env_file
 from .utils import check_ngrok

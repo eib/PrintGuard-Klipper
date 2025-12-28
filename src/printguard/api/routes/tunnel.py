@@ -5,9 +5,11 @@ from ...core.config import get_settings, TunnelProvider
 from ...core.utils import update_env_file
 from ..crypto_utils import EncryptedRoute
 from ..auth_utils import get_current_identity
-from ...services.tunnels import stop_active_tunnel
-from ...services.tunnel import is_cloudflared_installed
-from ...services.ngrok import is_ngrok_installed
+from ...services.tunnel_manager import (
+    stop_active_tunnel,
+    is_cloudflared_installed,
+    is_ngrok_installed
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(route_class=EncryptedRoute)

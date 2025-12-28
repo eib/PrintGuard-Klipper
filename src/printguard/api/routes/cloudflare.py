@@ -1,10 +1,9 @@
 import logging
 from fastapi import APIRouter, Depends, Query, HTTPException, Security, Request
 from ...core.models import CFAccount, CFZone, CFTunnelRequest, CFTunnelResponse, CFExistenceResponse
-from ...services.tunnel import CloudflareManager, run_tunnel
-from ...services.tunnels import stop_active_tunnel
+from ...services.tunnel_manager import CloudflareManager, run_tunnel, stop_active_tunnel
 from ...core.config import get_settings, TunnelProvider
-from ...core.utils import generate_random_string, update_env_file
+from ...core.utils import update_env_file
 from .utils import check_cloudflared
 from ..crypto_utils import EncryptedRoute
 from ..auth_utils import get_current_identity

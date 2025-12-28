@@ -1,0 +1,87 @@
+site_name: PrintGuard Documentation
+site_description: Local, real-time 3D printing failure detection and monitoring
+site_url: https://oliverbravery.github.io/PrintGuard/
+repo_url: https://github.com/oliverbravery/PrintGuard
+repo_name: oliverbravery/PrintGuard
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: blue
+      accent: blue
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: blue
+      accent: blue
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - search.highlight
+    - content.code.copy
+
+plugins:
+  - search
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - admonition
+  - pymdownx.details
+  - tables
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Installation: getting-started/installation.md
+    - Quick Start: getting-started/quick-start.md
+    - Configuration: getting-started/initial-configuration.md
+  - User Guide:
+    - Dashboard: user-guide/dashboard.md
+    - Printers: user-guide/printers.md
+    - Components: user-guide/components.md
+    - Connections: user-guide/connections.md
+    - Notifications: user-guide/notifications.md
+  - Integrations:
+    - Overview: integrations/overview.md
+    - Bambu Labs: integrations/providers/bambulabs.md
+    - OctoPrint: integrations/providers/octoprint.md
+    - Home Assistant: integrations/providers/homeassistant.md
+    - Webcam: integrations/providers/webcam.md
+    - Cloudflare Tunnel: integrations/tunneling/cloudflare.md
+    - ngrok: integrations/tunneling/ngrok.md
+  - Home Assistant:
+    - Installation: home-assistant/installation.md
+    - Configuration: home-assistant/configuration.md
+    - Entities: home-assistant/entities.md
+    - Automations: home-assistant/automations.md
+  - API Reference:
+    - Overview: api/overview.md
+    - Authentication: api/authentication.md
+    - Endpoints:
+      - Printers: api/endpoints/printers.md
+      - Components: api/endpoints/components.md
+      - Connections: api/endpoints/connections.md
+      - Streaming: api/endpoints/rtc.md
+      - Notifications: api/endpoints/notifications.md
+      - Admin: api/endpoints/admin.md
+  - Development:
+    - Architecture: development/architecture.md
+    - Contributing: development/contributing.md
+    - Local Setup: development/local-development.md
+  - Deployment:
+    - Docker: deployment/docker.md
+    - Security: deployment/security.md
+  - Reference:
+    - Configuration: reference/configuration.md
+    - CLI: reference/cli.md
+
