@@ -77,9 +77,20 @@ const emit = defineEmits<{
   }
 }
 
-.sm { width: 400px; }
-.md { width: 600px; }
-.lg { width: 900px; }
+.sm {
+  width: 90%;
+  max-width: 400px;
+}
+
+.md {
+  width: 90%;
+  max-width: 600px;
+}
+
+.lg {
+  width: 90%;
+  max-width: 900px;
+}
 
 .header {
   padding: var(--space-5) var(--space-6);
@@ -125,5 +136,54 @@ const emit = defineEmits<{
   display: flex;
   justify-content: flex-end;
   gap: var(--space-3);
+}
+
+/* ============================================
+   Mobile Responsive Styles
+   ============================================ */
+
+@media (max-width: 768px) {
+  .modal {
+    width: 95%;
+    max-width: none;
+    margin: var(--space-4);
+    max-height: calc(100vh - var(--space-8));
+  }
+
+  .header {
+    padding: var(--space-4) var(--space-5);
+  }
+
+  .header h3 {
+    font-size: var(--font-size-lg);
+  }
+
+  .body {
+    padding: var(--space-4) var(--space-5);
+  }
+
+  .footer {
+    padding: var(--space-4) var(--space-5);
+    flex-direction: column-reverse;
+  }
+
+  .footer button {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .modal {
+    margin: var(--space-2);
+    max-height: calc(100vh - var(--space-4));
+    border-radius: var(--radius-xl);
+  }
+
+  .header,
+  .body,
+  .footer {
+    padding-left: var(--space-4);
+    padding-right: var(--space-4);
+  }
 }
 </style>

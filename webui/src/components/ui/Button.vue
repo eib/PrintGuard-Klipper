@@ -157,5 +157,26 @@ function handleClick(event: MouseEvent) {
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
+
+/* ============================================
+   Mobile Responsive Styles
+   ============================================ */
+
+@media (max-width: 768px) {
+  .sm {
+    min-height: var(--mobile-tap-target);
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .md {
+    min-height: var(--mobile-tap-target);
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .lg {
+    min-height: calc(var(--mobile-tap-target) + var(--space-1));
+    padding: var(--space-4) var(--space-5);
+  }
+}
 </style>
 

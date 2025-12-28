@@ -404,4 +404,63 @@ async function sendTestNotification() {
   display: flex;
   gap: var(--space-2);
 }
+
+/* ============================================
+   Mobile Responsive Styles
+   ============================================ */
+
+@media (max-width: 768px) {
+  .header {
+    height: auto;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-3);
+  }
+
+  .titleInfo {
+    width: 100%;
+  }
+
+  .inferenceWrapper {
+    width: 100%;
+    align-items: flex-start;
+  }
+
+  .footer {
+    height: auto;
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-4);
+  }
+
+  .controls {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .cardActions {
+    justify-content: center;
+  }
+
+  .divider {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .controls {
+    flex-direction: column;
+  }
+
+  .controls button,
+  .controls .button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .cardActions {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+}
 </style>

@@ -119,5 +119,46 @@ function update() {
   color: var(--primary-on);
   border-color: var(--primary);
 }
+
+/* ============================================
+   Mobile Responsive Styles
+   ============================================ */
+
+@media (max-width: 768px) {
+  .filters {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-4);
+    padding: var(--space-4);
+  }
+
+  .chips {
+    flex-wrap: wrap;
+  }
+
+  .chip {
+    flex: 1;
+    min-width: calc(50% - var(--space-1));
+    text-align: center;
+    padding: var(--space-2) var(--space-3);
+    font-size: var(--font-size-sm);
+  }
+}
+
+@media (max-width: 480px) {
+  .filters {
+    padding: var(--space-3);
+  }
+
+  .chips {
+    gap: var(--space-1);
+  }
+
+  .chip {
+    min-width: calc(50% - var(--space-0.5));
+    padding: var(--space-2);
+    font-size: var(--font-size-xs);
+  }
+}
 </style>
 

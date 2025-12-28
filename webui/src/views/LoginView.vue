@@ -111,4 +111,42 @@ async function handleLogin() {
   color: var(--text-secondary);
   font-size: var(--font-size-base);
 }
+
+/* ============================================
+   Mobile Responsive Styles
+   ============================================ */
+
+@media (max-width: 768px) {
+  .container {
+    padding: var(--space-3);
+  }
+
+  .card {
+    padding: var(--space-6);
+    max-width: 100%;
+  }
+
+  .header h1 {
+    font-size: var(--font-size-2xl);
+  }
+
+  .header p {
+    font-size: var(--font-size-sm);
+  }
+
+  .header {
+    margin-bottom: var(--space-6);
+  }
+}
+
+@media (max-width: 480px) {
+  .card {
+    padding: var(--space-5);
+    border-radius: var(--radius-xl);
+  }
+
+  .header h1 {
+    font-size: var(--font-size-xl);
+  }
+}
 </style>

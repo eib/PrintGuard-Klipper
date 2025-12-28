@@ -305,4 +305,38 @@ watch(() => formData.value.components.control, (newControl) => {
   width: 1rem;
   height: 1rem;
 }
+
+/* ============================================
+   Mobile Responsive Styles
+   ============================================ */
+
+@media (max-width: 768px) {
+  .form-row {
+    grid-template-columns: 1fr;
+    gap: var(--space-3);
+  }
+
+  .form-section-title {
+    font-size: var(--font-size-sm);
+    margin: var(--space-4) 0 var(--space-3);
+  }
+
+  .field-help {
+    font-size: var(--font-size-xs);
+  }
+
+  .checkboxLabel {
+    font-size: var(--font-size-sm);
+  }
+}
+
+@media (max-width: 480px) {
+  .form-row {
+    gap: var(--space-2);
+  }
+
+  .form-section-title {
+    margin: var(--space-3) 0 var(--space-2);
+  }
+}
 </style>

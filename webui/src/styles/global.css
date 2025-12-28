@@ -292,3 +292,79 @@ textarea::placeholder {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* ============================================
+   Mobile Responsive Styles
+   ============================================ */
+
+/* Prevent horizontal scroll on mobile */
+@media (max-width: 768px) {
+  html, body {
+    overflow-x: hidden;
+  }
+
+  #app {
+    overflow-x: hidden;
+  }
+
+  /* Adjust page headers for mobile */
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-3);
+  }
+
+  .page-header h1 {
+    font-size: var(--font-size-2xl);
+  }
+
+  .page-subtitle {
+    font-size: var(--font-size-sm);
+  }
+
+  /* Adjust container padding for mobile */
+  .container {
+    padding: 0 var(--space-4);
+  }
+
+  /* Adjust loading and empty states for mobile */
+  .loading-state,
+  .empty-state {
+    padding: var(--space-12) var(--space-4);
+    border-radius: var(--radius-xl);
+  }
+
+  /* Adjust table styles for mobile */
+  .table-container {
+    border-radius: var(--radius-lg);
+  }
+
+  .base-table th,
+  .base-table td {
+    padding: var(--space-2) var(--space-3);
+  }
+
+  /* Adjust form styles for mobile */
+  .form-field {
+    gap: var(--space-1);
+  }
+
+  .form-field label {
+    font-size: var(--font-size-sm);
+  }
+}
+
+@media (max-width: 480px) {
+  .container {
+    padding: 0 var(--space-3);
+  }
+
+  .page-header h1 {
+    font-size: var(--font-size-xl);
+  }
+
+  .loading-state,
+  .empty-state {
+    padding: var(--space-8) var(--space-3);
+  }
+}

@@ -80,4 +80,49 @@ const auth = useAuthStore()
   border-left: 4px solid var(--primary);
   padding-left: var(--space-4);
 }
+
+/* ============================================
+   Mobile Responsive Styles
+   ============================================ */
+
+@media (max-width: 768px) {
+  .view {
+    gap: var(--space-6);
+  }
+
+  .header h1 {
+    font-size: var(--font-size-2xl);
+  }
+
+  .subtitle {
+    font-size: var(--font-size-sm);
+  }
+
+  .sections {
+    gap: var(--space-10);
+  }
+
+  .section {
+    gap: var(--space-4);
+  }
+
+  .section h2 {
+    font-size: var(--font-size-xl);
+    padding-left: var(--space-3);
+  }
+}
+
+@media (max-width: 480px) {
+  .view {
+    gap: var(--space-4);
+  }
+
+  .sections {
+    gap: var(--space-8);
+  }
+
+  .section h2 {
+    font-size: var(--font-size-lg);
+  }
+}
 </style>

@@ -124,5 +124,33 @@ onMounted(fetchSettings)
   text-align: center;
   color: var(--text-tertiary);
 }
+
+/* ============================================
+   Mobile Responsive Styles
+   ============================================ */
+
+@media (max-width: 768px) {
+  .container {
+    padding: var(--space-4);
+  }
+
+  .form {
+    gap: var(--space-4);
+  }
+
+  .helpText {
+    font-size: var(--font-size-xs);
+  }
+}
+
+@media (max-width: 480px) {
+  .container {
+    padding: var(--space-3);
+  }
+
+  .form {
+    gap: var(--space-3);
+  }
+}
 </style>
 

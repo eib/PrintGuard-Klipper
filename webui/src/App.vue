@@ -1,19 +1,30 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import { RouterLink, RouterView } from 'vue-router'
 import { useAuthStore } from './store/auth'
 import { useSystemStore } from './store/system'
 import { useTheme } from './composables/useTheme'
 import ConnectionError from './components/shared/ConnectionError.vue'
 import ThemeToggle from './components/ui/ThemeToggle.vue'
+import { Menu, X } from 'lucide-vue-next'
 
 const auth = useAuthStore()
 const system = useSystemStore()
 const { initTheme } = useTheme()
+const mobileMenuOpen = ref(false)
 
 initTheme()
 
 function reload() {
   window.location.reload()
+}
+
+function toggleMobileMenu() {
+  mobileMenuOpen.value = !mobileMenuOpen.value
+}
+
+function closeMobileMenu() {
+  mobileMenuOpen.value = false
 }
 </script>
 
@@ -33,13 +44,41 @@ function reload() {
       <nav v-if="auth.isAuthenticated" :class="$style.nav">
         <div :class="$style.container">
           <div :class="$style.logo">PrintGuard</div>
+
+          <!-- Desktop Navigation -->
           <div :class="$style.links">
-            <RouterLink to="/" :class="$style.link" active-class="active">Dashboard</RouterLink>
-            <RouterLink to="/connections" :class="$style.link" active-class="active">Connections</RouterLink>
-            <RouterLink to="/components" :class="$style.link" active-class="active">Components</RouterLink>
-            <RouterLink to="/settings" :class="$style.link" active-class="active">Settings</RouterLink>
+            <RouterLink to="/" :class="$style.link" active-class="active" @click="closeMobileMenu">Dashboard</RouterLink>
+            <RouterLink to="/connections" :class="$style.link" active-class="active" @click="closeMobileMenu">Connections</RouterLink>
+            <RouterLink to="/components" :class="$style.link" active-class="active" @click="closeMobileMenu">Components</RouterLink>
+            <RouterLink to="/settings" :class="$style.link" active-class="active" @click="closeMobileMenu">Settings</RouterLink>
             <ThemeToggle :class="$style.themeToggle" />
             <button @click="auth.logout()" :class="$style.logout">Logout</button>
+          </div>
+
+          <!-- Mobile Menu Toggle -->
+          <button
+            :class="$style.mobileMenuToggle"
+            @click="toggleMobileMenu"
+            :aria-expanded="mobileMenuOpen"
+            aria-label="Toggle navigation menu"
+          >
+            <Menu v-if="!mobileMenuOpen" :size="24" />
+            <X v-else :size="24" />
+          </button>
+        </div>
+
+        <!-- Mobile Navigation Menu -->
+        <div :class="[$style.mobileMenu, { [$style.mobileMenuOpen]: mobileMenuOpen }]">
+          <div :class="$style.mobileMenuContent">
+            <RouterLink to="/" :class="$style.mobileLink" active-class="active" @click="closeMobileMenu">Dashboard</RouterLink>
+            <RouterLink to="/connections" :class="$style.mobileLink" active-class="active" @click="closeMobileMenu">Connections</RouterLink>
+            <RouterLink to="/components" :class="$style.mobileLink" active-class="active" @click="closeMobileMenu">Components</RouterLink>
+            <RouterLink to="/settings" :class="$style.mobileLink" active-class="active" @click="closeMobileMenu">Settings</RouterLink>
+            <div :class="$style.mobileMenuDivider"></div>
+            <div :class="$style.mobileMenuActions">
+              <ThemeToggle />
+              <button @click="auth.logout()" :class="$style.mobileLogout">Logout</button>
+            </div>
           </div>
         </div>
       </nav>
@@ -152,5 +191,131 @@ function reload() {
 .main {
   flex: 1;
   padding: var(--space-8) 0;
+}
+
+/* ============================================
+   Mobile Navigation Styles
+   ============================================ */
+
+.mobileMenuToggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--mobile-tap-target);
+  height: var(--mobile-tap-target);
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-radius: var(--radius-lg);
+  transition: all var(--transition-fast);
+}
+
+.mobileMenuToggle:hover {
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.mobileMenu {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background-color: var(--card-bg);
+  border-bottom: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-lg);
+  z-index: var(--z-dropdown);
+  overflow: hidden;
+  max-height: 0;
+  transition: max-height var(--transition-base) ease-out;
+}
+
+.mobileMenuOpen {
+  max-height: 500px;
+}
+
+.mobileMenuContent {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-4);
+  gap: var(--space-2);
+}
+
+.mobileLink {
+  padding: var(--space-3) var(--space-4);
+  color: var(--text-secondary);
+  font-weight: var(--font-weight-medium);
+  font-size: var(--font-size-base);
+  border-radius: var(--radius-lg);
+  transition: all var(--transition-fast);
+  text-decoration: none;
+}
+
+.mobileLink:hover {
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.mobileLink :global(.active) {
+  background-color: var(--primary-50);
+  color: var(--primary);
+}
+
+.mobileMenuDivider {
+  height: 1px;
+  background-color: var(--border-subtle);
+  margin: var(--space-2) 0;
+}
+
+.mobileMenuActions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding-top: var(--space-2);
+}
+
+.mobileLogout {
+  padding: var(--space-3) var(--space-4);
+  color: var(--danger);
+  font-weight: var(--font-weight-medium);
+  font-size: var(--font-size-base);
+  background: none;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  text-align: left;
+}
+
+.mobileLogout:hover {
+  background-color: var(--danger-bg);
+  border-color: var(--danger-200);
+}
+
+/* ============================================
+   Mobile Responsive Styles
+   ============================================ */
+
+@media (max-width: 768px) {
+  .links {
+    display: none;
+  }
+
+  .mobileMenuToggle {
+    display: flex;
+  }
+
+  .mobileMenu {
+    display: block;
+  }
+
+  .nav .container {
+    position: relative;
+  }
+
+  .main {
+    padding: var(--space-6) 0;
+  }
 }
 </style>

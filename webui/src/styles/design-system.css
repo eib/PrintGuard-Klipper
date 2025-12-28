@@ -244,6 +244,20 @@
   --z-modal: 1050;
   --z-popover: 1060;
   --z-tooltip: 1070;
+
+  /* ============================================
+     Responsive Breakpoints
+     ============================================ */
+  --breakpoint-sm: 640px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+  --breakpoint-xl: 1280px;
+
+  /* ============================================
+     Mobile-Specific Adjustments
+     ============================================ */
+  --mobile-tap-target: 44px;
+  --mobile-spacing-reduction: 0.75;
 }
 
 /* ============================================
@@ -277,5 +291,55 @@ select:focus {
   transition: background-color var(--transition-fast),
               border-color var(--transition-fast),
               box-shadow var(--transition-fast);
+}
+
+/* ============================================
+   Mobile Responsive Styles
+   ============================================ */
+
+/* Tablet and below (max-width: 1024px) */
+@media (max-width: 1024px) {
+  :root {
+    --space-16: 3rem;
+    --space-20: 4rem;
+    --space-24: 5rem;
+  }
+}
+
+/* Mobile devices (max-width: 768px) */
+@media (max-width: 768px) {
+  :root {
+    /* Reduce spacing for mobile */
+    --space-8: 1.5rem;
+    --space-10: 2rem;
+    --space-12: 2.5rem;
+    --space-16: 3rem;
+    --space-20: 3.5rem;
+    --space-24: 4rem;
+
+    /* Slightly smaller font sizes on mobile */
+    --font-size-3xl: 1.5rem;
+    --font-size-2xl: 1.25rem;
+    --font-size-xl: 1.125rem;
+  }
+
+  html {
+    font-size: 14px;
+  }
+}
+
+/* Small mobile devices (max-width: 480px) */
+@media (max-width: 480px) {
+  :root {
+    --space-6: 1rem;
+    --space-8: 1.25rem;
+    --space-10: 1.5rem;
+    --space-12: 2rem;
+    --space-16: 2.5rem;
+  }
+
+  html {
+    font-size: 13px;
+  }
 }
 

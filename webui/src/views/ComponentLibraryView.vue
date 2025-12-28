@@ -137,4 +137,31 @@ function openPreview(comp: Component) {
 </template>
 
 <style module>
+/* ============================================
+   Mobile Responsive Styles
+   ============================================ */
+
+@media (max-width: 768px) {
+  .view {
+    gap: var(--space-6);
+  }
+
+  .header h1 {
+    font-size: var(--font-size-2xl);
+  }
+
+  .subtitle {
+    font-size: var(--font-size-sm);
+  }
+}
+
+@media (max-width: 480px) {
+  .view {
+    gap: var(--space-4);
+  }
+
+  .header h1 {
+    font-size: var(--font-size-xl);
+  }
+}
 </style>

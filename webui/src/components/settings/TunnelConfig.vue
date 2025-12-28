@@ -448,6 +448,8 @@ onMounted(fetchInitialData)
   cursor: pointer;
   text-decoration: underline;
   transition: color var(--transition-fast);
+  word-break: break-all;
+  overflow-wrap: break-word;
 }
 
 .url:hover {
@@ -543,5 +545,64 @@ onMounted(fetchInitialData)
   padding: var(--space-12);
   text-align: center;
   color: var(--text-tertiary);
+}
+
+/* ============================================
+   Mobile Responsive Styles
+   ============================================ */
+
+@media (max-width: 768px) {
+  .section {
+    gap: var(--space-6);
+  }
+
+  .statusCard, .selectionCard {
+    padding: var(--space-4);
+  }
+
+  .statusHeader {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-3);
+  }
+
+  .statusHeader h3 {
+    font-size: var(--font-size-sm);
+  }
+
+  .statusInfo {
+    gap: var(--space-6);
+  }
+
+  .statusRow {
+    gap: var(--space-1);
+  }
+
+  .wizard h4 {
+    font-size: var(--font-size-lg);
+  }
+
+  .wizard p {
+    font-size: var(--font-size-sm);
+  }
+
+  .subInput {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .domainSuffix {
+    margin-top: var(--space-1);
+  }
+}
+
+@media (max-width: 480px) {
+  .statusCard, .selectionCard {
+    padding: var(--space-3);
+  }
+
+  .statusInfo {
+    gap: var(--space-4);
+  }
 }
 </style>
