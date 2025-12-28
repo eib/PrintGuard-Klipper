@@ -285,7 +285,7 @@ onMounted(fetchInitialData)
             <p>You need an API Token with <b>Cloudflare Tunnel:Edit</b> and <b>DNS:Edit</b> permissions.</p>
             <ol :class="$style.list">
               <li>Go to <a href="https://dash.cloudflare.com/profile/api-tokens" target="_blank">Cloudflare Dashboard</a></li>
-              <li>Create Token -> Use 'Cloudflare Tunnel' template</li>
+              <li>Create Token -> Create Custom Token</li>
               <li>Ensure 'Account' and 'Zone' resources are correctly scoped</li>
             </ol>
             <div class="base-form">

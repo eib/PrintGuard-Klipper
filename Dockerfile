@@ -27,6 +27,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libvpx-dev \
     pkg-config \
     libsrtp2-dev \
+    && ARCH=$(dpkg --print-architecture) \
+    && curl -L -o /tmp/cloudflared.deb "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${ARCH}.deb" \
+    && dpkg -i /tmp/cloudflared.deb \
+    && rm /tmp/cloudflared.deb \
     && rm -rf /var/lib/apt/lists/*
 
 # Set work directory
@@ -58,13 +62,9 @@ COPY . .
 # Install the project in editable mode or just ensure scripts are installed
 RUN pip install --no-cache-dir .
 
-# Copy and set up entrypoint script
-COPY docker-entrypoint.sh /usr/local/bin/
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
-
 # Expose the port the app runs on
 EXPOSE $PORT
 
 # Command to run the application
-ENTRYPOINT ["docker-entrypoint.sh"]
-CMD ["printguard", "serve"]
+ENTRYPOINT ["printguard"]
+CMD ["serve"]
