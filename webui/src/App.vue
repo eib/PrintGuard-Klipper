@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { RouterLink, RouterView } from 'vue-router'
 import { useAuthStore } from './store/auth'
 import { useSystemStore } from './store/system'
 import { useTheme } from './composables/useTheme'
+import { isSubscribed, subscribeUserToPush } from './services/notifications'
 import ConnectionError from './components/shared/ConnectionError.vue'
 import ThemeToggle from './components/ui/ThemeToggle.vue'
 import { Menu, X } from 'lucide-vue-next'
@@ -14,6 +15,15 @@ const { initTheme } = useTheme()
 const mobileMenuOpen = ref(false)
 
 initTheme()
+
+watch(() => auth.isAuthenticated, async (authenticated) => {
+  if (authenticated) {
+    const subscribed = await isSubscribed()
+    if (!subscribed) {
+      await subscribeUserToPush()
+    }
+  }
+}, { immediate: true })
 
 function reload() {
   window.location.reload()

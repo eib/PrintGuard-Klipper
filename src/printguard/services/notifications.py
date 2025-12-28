@@ -111,3 +111,37 @@ async def _notify_defect_async(session_id: str, defect_class: str, confidence: f
         
         success_count = sum(1 for r in results if r)
         logger.info(f"Sent {success_count}/{len(subscriptions)} push notifications for printer {printer_id}")
+
+async def notify_user_camera_access(user_id: int, camera_name: str):
+    """Notify all devices of a user that someone wants to access their camera."""
+    async with SessionLocal() as db:
+        result = await db.execute(
+            select(PushSubscription).where(
+                PushSubscription.user_id == user_id,
+                PushSubscription.endpoint.is_not(None),
+                PushSubscription.p256dh.is_not(None),
+                PushSubscription.auth.is_not(None)
+            )
+        )
+        subscriptions = result.scalars().all()
+        
+        if not subscriptions:
+            logger.info(f"No active device subscriptions found for user {user_id}")
+            return
+
+        logger.info(f"Found {len(subscriptions)} active device subscriptions for user {user_id}")
+
+        base_url = settings.last_known_public_base_url or ""
+        payload = {
+            "title": "Camera Access Requested",
+            "body": f"Someone wants to access your camera '{camera_name}'. Please open PrintGuard on the host device to start the stream.",
+            "data": {
+                "url": base_url or "/" 
+            }
+        }
+
+        tasks = [send_push_notification(sub, payload) for sub in subscriptions]
+        results = await asyncio.gather(*tasks)
+        
+        success_count = sum(1 for r in results if r)
+        logger.info(f"Sent {success_count}/{len(subscriptions)} push notifications for user {user_id}")

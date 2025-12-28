@@ -71,15 +71,19 @@ async def get_component(
 async def create_component(
     request: ComponentCreate,
     db: AsyncSession = Depends(get_db),
-    _: any = Security(get_current_identity, scopes=["printer:write"])
+    user: any = Security(get_current_identity, scopes=["printer:write"])
 ):
     """Create a new component."""
+    entity_config = request.entity_config or {}
+    if request.provider == "webcam" and entity_config.get("type") == "browser":
+        entity_config["owner_id"] = user.id
+
     component = Component(
         name=request.name,
         type=request.type,
         provider=request.provider,
         connection_id=request.connection_id,
-        entity_config=request.entity_config
+        entity_config=entity_config
     )
     db.add(component)
     await db.commit()
@@ -217,6 +221,12 @@ async def link_component_stream(
     track, pc = await instance.get_camera_track()
     
     if not track:
+        if db_comp.provider == "webcam" and db_comp.entity_config.get("type") == "browser":
+            owner_id = db_comp.entity_config.get("owner_id")
+            if owner_id:
+                from ...services.notifications import notify_user_camera_access
+                await notify_user_camera_access(owner_id, db_comp.name or "Camera")
+        
         raise HTTPException(status_code=404, detail="Camera track not available")
         
     model_info = get_model()

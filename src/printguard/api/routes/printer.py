@@ -381,6 +381,24 @@ async def link_printer_stream(
     
     track, pc = await instance.camera.get_camera_track()
     if not track:
+        result = await db.execute(
+            select(Printer).where(Printer.id == printer_id).options(
+                selectinload(Printer.component_links)
+                .joinedload(PrinterComponentLink.component)
+            )
+        )
+        db_p = result.scalar_one_or_none()
+        if db_p:
+            for link in db_p.component_links:
+                if link.role == "camera":
+                    db_comp = link.component
+                    if db_comp.provider == "webcam" and db_comp.entity_config.get("type") == "browser":
+                        owner_id = db_comp.entity_config.get("owner_id")
+                        if owner_id:
+                            from ...services.notifications import notify_user_camera_access
+                            await notify_user_camera_access(owner_id, db_comp.name or instance.config.name)
+                    break
+        
         raise HTTPException(status_code=404, detail="Camera track not available")
     
     model_info = get_model()
