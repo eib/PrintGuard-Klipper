@@ -1,12 +1,42 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "printguard-shared"
 version = "0.1.0"
+description = "Shared utilities for PrintGuard backend and Home Assistant integration"
+readme = "README.md"
+requires-python = ">=3.13"
+license = {text = "GPL-2.0-only"}
+authors = [
+    {name = "Oliver Bravery", email = "dev@oliverbravery.uk"}
+]
+maintainers = [
+    {name = "Oliver Bravery", email = "dev@oliverbravery.uk"}
+]
+keywords = ["printguard", "3d-printing", "home-assistant", "cryptography"]
+classifiers = [
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: GNU General Public License v2 (GPLv2)",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Home Automation",
+]
 dependencies = ["cryptography>=41.0.0"]
 
+[project.urls]
+Homepage = "https://github.com/oliverbravery/PrintGuard"
+Repository = "https://github.com/oliverbravery/PrintGuard"
+Documentation = "https://oliverbravery.github.io/PrintGuard/"
+Issues = "https://github.com/oliverbravery/PrintGuard/issues"
+"PyPI Package" = "https://pypi.org/project/printguard-shared/"
+
 [project.optional-dependencies]
-dev = ["pytest"]
+dev = ["pytest", "build", "twine"]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["printguard_shared*"]
+exclude = ["tests*", "build*", "dist*", "*.egg-info*"]
 
