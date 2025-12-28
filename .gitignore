@@ -17,4 +17,5 @@ webui/node_modules/
 webui/dist/
 .env
 screenshots/
+dist/
 !.github
