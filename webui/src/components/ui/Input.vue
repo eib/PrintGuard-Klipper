@@ -6,7 +6,7 @@ type Size = 'sm' | 'md' | 'lg'
 const $style = useCssModule()
 
 const props = withDefaults(defineProps<{
-  modelValue: string
+  modelValue: string | number
   type?: 'text' | 'email' | 'password' | 'number' | 'url' | 'tel'
   placeholder?: string
   disabled?: boolean
@@ -26,7 +26,7 @@ const props = withDefaults(defineProps<{
 })
 
 const emit = defineEmits<{
-  (e: 'update:modelValue', value: string): void
+  (e: 'update:modelValue', value: string | number): void
   (e: 'focus', event: FocusEvent): void
   (e: 'blur', event: FocusEvent): void
   (e: 'keydown', event: KeyboardEvent): void
