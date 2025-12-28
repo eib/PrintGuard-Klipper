@@ -24,7 +24,7 @@ Then visit `http://localhost:8000` to access the dashboard.
 - **Local & Private**: All image processing happens on your hardware. No cloud required.
 - **Smart Detection**: Detects spaghetti, adhesion failures, and more using an optimized AI model.
 - **Home Assistant Integration**: Full control and monitoring from your smart home dashboard.
-- **Broad Support**: Works with OctoPrint, Bambu Labs, and any standard USB or IP camera.
+- **Broad Support**: Works with OctoPrint, Bambu Labs, Home Assistant and any standard USB or IP camera.
 - **Remote Access**: Built-in support for secure tunneling via Cloudflare or ngrok.
 
 ## 📖 Documentation
