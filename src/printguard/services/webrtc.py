@@ -35,6 +35,8 @@ class VideoProcessor:
         self._latest_frame: VideoFrame | None = None
         self._frame_ready = asyncio.Event()
         self._running = True
+        self.pause_inference = getattr(settings, "inference_paused", False)
+        self._just_resumed = True
         self._last_notified_class: str | None = None
         self._results_buffer = deque(maxlen=50)
         self._inference_times = deque(maxlen=10)
@@ -82,7 +84,20 @@ class VideoProcessor:
         """Process the latest available frame."""
         logger.info(f"Started inference loop for session {self.session_id} with target_fps {self.settings.target_fps}")
         last_log_time = 0
+        was_paused = False
         while self._running:
+            if self.pause_inference:
+                was_paused = True
+                await asyncio.sleep(0.1)
+                continue
+
+            if was_paused:
+                logger.info(f"Resuming inference for session {self.session_id}")
+                self._inference_times.clear()
+                self._results_buffer.clear()
+                self._just_resumed = True
+                was_paused = False
+
             if 0 < self.settings.target_fps < 100:
                 elapsed = time.time() - self._last_inference_time
                 wait_time = (1.0 / self.settings.target_fps) - elapsed
@@ -101,6 +116,7 @@ class VideoProcessor:
             self._last_inference_time = time.time()
             self._inference_times.append(self._last_inference_time)
             
+            logger.debug(f"Running inference for session {self.session_id}")
             self._inference_count = getattr(self, "_inference_count", 0) + 1
             if self._inference_count % 100 == 0:
                 logger.debug(f"Running inference {self._inference_count} for session {self.session_id}")
@@ -122,19 +138,17 @@ class VideoProcessor:
             if result:
                 self._results_buffer.append(result.get("class_name"))
                 
-                # Calculate majority class
-                window_size = max(1, self.settings.majority_voting)
-                recent_results = list(self._results_buffer)[-window_size:]
-                if recent_results:
-                    majority_class = Counter(recent_results).most_common(1)[0][0]
-                    result["class_name"] = majority_class
-                
-                # Calculate actual FPS
                 actual_fps = 0.0
                 if len(self._inference_times) > 1:
                     duration = self._inference_times[-1] - self._inference_times[0]
                     if duration > 0:
                         actual_fps = (len(self._inference_times) - 1) / duration
+                
+                window_size = max(1, self.settings.majority_voting)
+                recent_results = list(self._results_buffer)[-window_size:]
+                if recent_results:
+                    majority_class = Counter(recent_results).most_common(1)[0][0]
+                    result["class_name"] = majority_class
                 
                 if self._last_inference_time - last_log_time > 5:
                     logger.debug(f"Session {self.session_id} stats: target_fps={self.settings.target_fps}, actual_fps={actual_fps:.2f}, sensitivity={self.settings.sensitivity}, infer_time={infer_duration*1000:.1f}ms")
@@ -157,18 +171,38 @@ class VideoProcessor:
                 if self.session_id:
                     class_name = result_model.class_name
                     if class_name and class_name != PredictionClass.NORMAL and class_name != self._last_notified_class:
-                        self._last_notified_class = class_name
-                        notify_defect(self.session_id, str(class_name), result_model.confidence or 0)
-                        if self.on_defect:
-                            try:
-                                if asyncio.iscoroutinefunction(self.on_defect):
-                                    asyncio.create_task(self.on_defect(str(class_name), result_model.confidence or 0))
-                                else:
-                                    self.on_defect(str(class_name), result_model.confidence or 0)
-                            except Exception as e:
-                                logger.error(f"Error in on_defect callback for session {self.session_id}: {e}")
+                        if self._just_resumed:
+                            self._last_notified_class = class_name
+                            self._just_resumed = False
+                        else:
+                            self._last_notified_class = class_name
+                            
+                            self.pause_inference = True
+                            
+                            screenshot_path = None
+                            if frame:
+                                try:
+                                    import os
+                                    from datetime import datetime
+                                    os.makedirs("screenshots", exist_ok=True)
+                                    filename = f"defect_{self.session_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg"
+                                    screenshot_path = os.path.join("screenshots", filename)
+                                    frame.to_image().save(screenshot_path)
+                                    logger.info(f"Saved defect screenshot to {screenshot_path}")
+                                except Exception as e:
+                                    logger.error(f"Failed to save defect screenshot: {e}")
+
+                            if self.on_defect:
+                                try:
+                                    if asyncio.iscoroutinefunction(self.on_defect):
+                                        asyncio.create_task(self.on_defect(str(class_name), result_model.confidence or 0, screenshot_path))
+                                    else:
+                                        self.on_defect(str(class_name), result_model.confidence or 0, screenshot_path)
+                                except Exception as e:
+                                    logger.error(f"Error in on_defect callback for session {self.session_id}: {e}")
                     elif class_name == PredictionClass.NORMAL:
                         self._last_notified_class = None
+                        self._just_resumed = False
     
     async def process(self, track):
         """Process incoming video track with two concurrent tasks."""

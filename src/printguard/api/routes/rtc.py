@@ -14,7 +14,6 @@ from ...core.models import (
 )
 from ...services.webrtc import create_peer_connection, create_viewer_connection
 from ...services.streams import stream_manager
-from ...services.notifications import unsubscribe
 from ..crypto_utils import EncryptedRoute
 from ..auth_utils import get_current_identity
 
@@ -103,6 +102,7 @@ async def rtc_offer(
             settings.majority_voting = db_printer.inference_majority_voting
             settings.target_fps = db_printer.inference_target_fps
             settings.detection_action = db_printer.detection_action
+            settings.inference_paused = db_printer.inference_paused
 
     sdp = RTCSessionDescription(sdp=offer.sdp, type=offer.type)
     pc, processor = await create_peer_connection(
@@ -111,10 +111,21 @@ async def rtc_offer(
     
     if offer.printer_id:
         from .printer import trigger_printer_action
+        from ...services.notifications import notify_defect
         
-        async def on_defect(class_name: str, confidence: float):
+        async def on_defect(class_name: str, confidence: float, screenshot_path: str = None):
             if settings.detection_action and settings.detection_action != "none":
                 await trigger_printer_action(offer.printer_id, settings.detection_action)
+            
+            from ...core.database import async_session as SessionLocal
+            async with SessionLocal() as db_session:
+                res = await db_session.execute(select(Printer).where(Printer.id == offer.printer_id))
+                db_p = res.scalar_one_or_none()
+                if db_p:
+                    db_p.inference_paused = True
+                    await db_session.commit()
+            
+            notify_defect(offer.session_id, class_name, confidence, screenshot_path)
         
         processor.on_defect = on_defect
 
@@ -146,20 +157,22 @@ async def rtc_update_settings(session_id: str, settings: FeedSettings, _: any = 
     return {"status": "updated"}
 
 @router.get("/result/{session_id}")
-async def rtc_result(session_id: str, _: any = Security(get_current_identity, scopes=["rtc:stream"])) -> PredictionResult | dict:
+async def rtc_result(session_id: str, _: any = Security(get_current_identity, scopes=["rtc:stream"])) -> PredictionResult:
     """Get latest prediction result for a session."""
     source = stream_manager.get_source(session_id)
-    if not source:
-        return {"error": "Session not found"}
+    if not source or not source.processor:
+        return PredictionResult(status=PredictionStatus.WAITING, inference_paused=True)
+    
+    paused = getattr(source.processor, "pause_inference", False)
     result = source.processor.last_result
     if result:
-        return PredictionResult(**result, status=PredictionStatus.SUCCESS)
-    return PredictionResult(status=PredictionStatus.WAITING)
+        return PredictionResult(**result, status=PredictionStatus.SUCCESS, inference_paused=paused)
+    
+    return PredictionResult(status=PredictionStatus.WAITING, inference_paused=paused)
 
 
 @router.delete("/{session_id}")
 async def rtc_close(session_id: str, _: any = Security(get_current_identity, scopes=["rtc:stream"])) -> dict:
     """Close a WebRTC session."""
     await stream_manager.close_source(session_id)
-    unsubscribe(session_id)
     return {"status": "closed"}

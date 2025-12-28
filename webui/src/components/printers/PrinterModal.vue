@@ -8,6 +8,7 @@ import Input from '../ui/Input.vue'
 import Select from '../ui/Select.vue'
 import { usePrintersStore } from '../../store/printers'
 import { useComponentsStore } from '../../store/components'
+import { subscribeUserToPush } from '../../services/notifications'
 import type { Printer, PrinterCreate } from '../../types'
 
 const props = defineProps<{
@@ -23,6 +24,7 @@ const store = usePrintersStore()
 const compStore = useComponentsStore()
 const loading = ref(false)
 const error = ref<string | null>(null)
+const notificationsEnabled = ref(false)
 
 const showCompModal = ref(false)
 const activeCompType = ref<'camera' | 'control' | 'status'>('camera')
@@ -58,6 +60,7 @@ watch([() => props.show, () => props.printer], ([show, printer]) => {
         inference_target_fps: printer.inference_target_fps ?? 2.0,
         detection_action: printer.detection_action ?? 'none'
       }
+      notificationsEnabled.value = printer.notifications_enabled || false
     } else {
       formData.value = {
         name: '',
@@ -71,6 +74,7 @@ watch([() => props.show, () => props.printer], ([show, printer]) => {
         inference_target_fps: 2.0,
         detection_action: 'none'
       }
+      notificationsEnabled.value = false
     }
   }
 }, { immediate: true })
@@ -97,11 +101,18 @@ async function handleSave() {
   loading.value = true
   error.value = null
   try {
+    let savedPrinter
     if (props.printer) {
-      await store.update(props.printer.id, formData.value)
+      savedPrinter = await store.update(props.printer.id, formData.value)
     } else {
-      await store.create(formData.value)
+      savedPrinter = await store.create(formData.value)
     }
+
+    if (notificationsEnabled.value) {
+      await subscribeUserToPush()
+    }
+    await store.toggleNotifications(savedPrinter.id, notificationsEnabled.value)
+
     emit('close')
   } catch (e: any) {
     error.value = e.response?.data?.detail || 'Failed to save printer'
@@ -225,6 +236,15 @@ watch(() => formData.value.components.control, (newControl) => {
         </small>
       </div>
 
+      <div class="form-section-title">Notification Settings</div>
+      <div class="form-field">
+        <label :class="$style.checkboxLabel">
+          <input type="checkbox" v-model="notificationsEnabled" />
+          Notify me of defects on this printer
+        </label>
+        <small class="field-help">Requires browser notification permission.</small>
+      </div>
+
       <div v-if="error" class="form-error">{{ error }}</div>
     </form>
 
@@ -269,5 +289,19 @@ watch(() => formData.value.components.control, (newControl) => {
   font-size: 0.75rem;
   color: var(--text-secondary);
   margin-top: 0.25rem;
+}
+
+.checkboxLabel {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+  color: var(--text-primary);
+}
+
+.checkboxLabel input {
+  width: 1rem;
+  height: 1rem;
 }
 </style>

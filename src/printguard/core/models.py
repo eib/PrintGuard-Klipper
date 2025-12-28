@@ -15,6 +15,7 @@ class FeedSettings(BaseModel):
     majority_voting: int = 1
     target_fps: float = 1000.0
     detection_action: str = "none"
+    inference_paused: bool = False
 
 
 class RTCOffer(BaseModel):
@@ -44,6 +45,16 @@ class SessionSubscription(BaseModel):
     """Push subscription stored per session."""
     subscription: PushSubscriptionInfo
     device_name: str
+
+
+class NotificationSubscriptionRequest(BaseModel):
+    """Request to subscribe a device to push notifications."""
+    subscription: PushSubscriptionInfo
+
+
+class NotificationToggleRequest(BaseModel):
+    """Request to toggle notifications for a printer."""
+    enabled: bool
 
 
 class Session(BaseModel):
@@ -90,6 +101,7 @@ class PredictionResult(BaseModel):
     distances: Optional[dict[str, float]] = None
     status: PredictionStatus = PredictionStatus.SUCCESS
     actual_fps: Optional[float] = None
+    inference_paused: bool = False
 
 
 class CFAccount(BaseModel):
@@ -210,6 +222,7 @@ class PrinterConfig(BaseModel):
     inference_majority_voting: int = 1
     inference_target_fps: float = 1000.0
     detection_action: str = "none"
+    inference_paused: bool = False
 
 
 class PrinterInfo(BaseModel):
@@ -225,6 +238,8 @@ class PrinterInfo(BaseModel):
     inference_majority_voting: int = 1
     inference_target_fps: float = 1000.0
     detection_action: str = "none"
+    notifications_enabled: bool = False
+    inference_paused: bool = False
 
 
 class ConnectionInfo(BaseModel):

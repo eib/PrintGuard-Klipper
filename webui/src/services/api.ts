@@ -71,6 +71,7 @@ export const printersApi = {
   update: (id: string, data: PrinterUpdate) => api.put<Printer>(`/printer/${id}`, data),
   delete: (id: string) => api.delete(`/printer/${id}`),
   command: (id: string, cmd: string) => api.post(`/printer/${id}/${cmd}`),
+  inferenceCommand: (id: string, action: string) => api.post(`/printer/${id}/inference/${action}`),
   stream: (id: string, sessionId: string) => api.post(`/printer/${id}/stream`, {}, { params: { session_id: sessionId } }),
   providers: () => api.get<string[]>('/printer/providers'),
   providerSchema: (provider: string) => api.get<ProviderSchema>(`/printer/providers/${provider}/schema`)
@@ -110,6 +111,14 @@ export const cloudflareApi = {
   zones: (token: string) => api.get('/cloudflare/zones', { params: { api_token: token } }),
   checkExistence: (params: any) => api.get('/cloudflare/check-existence', { params }),
   setup: (token: string, data: any) => api.post('/cloudflare/tunnel', data, { params: { api_token: token } })
+}
+
+export const notificationsApi = {
+  getVapidPublicKey: () => api.get<{ public_key: string }>('/notifications/vapid-public-key'),
+  subscribe: (subscription: any) => api.post('/notifications/subscribe', { subscription }),
+  unsubscribe: (subscription: any) => api.post('/notifications/unsubscribe', { subscription }),
+  togglePrinter: (printerId: string, enabled: boolean) => api.put(`/notifications/printer/${printerId}`, { enabled }),
+  test: (printerId: string) => api.post(`/notifications/test/${printerId}`)
 }
 
 export default api

@@ -1,13 +1,13 @@
 from datetime import datetime, timedelta, timezone
 from typing import Annotated, Optional
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer, SecurityScopes
 from jose import JWTError, jwt
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..core.config import get_settings
+from ..core.config import get_settings, update_public_base_url
 from ..core.database import get_db
 from ..core.db_models import User, M2MApplication
 from ..core.hashing import verify_password, get_password_hash
@@ -38,8 +38,11 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
 async def get_current_identity(
     security_scopes: SecurityScopes,
     token: Annotated[str, Depends(oauth2_scheme)],
+    request: Request,
     db: AsyncSession = Depends(get_db)
 ):
+    update_public_base_url(dict(request.headers))
+
     if security_scopes.scopes:
         authenticate_value = f'Bearer scope="{security_scopes.scope_str}"'
     else:

@@ -32,6 +32,7 @@ class Printer(Base):
     inference_majority_voting: Mapped[int] = mapped_column(default=1)
     inference_target_fps: Mapped[float] = mapped_column(default=1000.0)
     detection_action: Mapped[str] = mapped_column(String(20), default="none")
+    inference_paused: Mapped[bool] = mapped_column(default=False)
     
     component_links: Mapped[list["PrinterComponentLink"]] = relationship(back_populates="printer", cascade="all, delete-orphan")
 
@@ -66,4 +67,26 @@ class PrinterComponentLink(Base):
     role: Mapped[str] = mapped_column(String(20), primary_key=True)
     printer: Mapped["Printer"] = relationship(back_populates="component_links")
     component: Mapped["Component"] = relationship(back_populates="printer_links")
+
+
+class PushSubscription(Base):
+    __tablename__ = "push_subscriptions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    endpoint: Mapped[str] = mapped_column(String(500), unique=True)
+    p256dh: Mapped[str] = mapped_column(String(255))
+    auth: Mapped[str] = mapped_column(String(255))
+
+    user: Mapped["User"] = relationship()
+
+
+class PrinterNotificationSubscription(Base):
+    __tablename__ = "printer_notification_subscriptions"
+
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), primary_key=True)
+    printer_id: Mapped[str] = mapped_column(ForeignKey("printers.id"), primary_key=True)
+
+    user: Mapped["User"] = relationship()
+    printer: Mapped["Printer"] = relationship()
 

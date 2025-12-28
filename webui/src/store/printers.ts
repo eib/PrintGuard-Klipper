@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
-import { printersApi } from '../services/api'
+import { printersApi, notificationsApi } from '../services/api'
 import type { Printer, PrinterCreate, PrinterUpdate } from '../types'
 
 export const usePrintersStore = defineStore('printers', () => {
@@ -52,14 +52,33 @@ export const usePrintersStore = defineStore('printers', () => {
     }
   }
 
+  async function toggleNotifications(id: string, enabled: boolean) {
+    await notificationsApi.togglePrinter(id, enabled)
+    const index = printers.value.findIndex(p => p.id === id)
+    if (index !== -1) {
+      printers.value[index].notifications_enabled = enabled
+    }
+  }
+
+  async function toggleInference(id: string, action: 'start' | 'stop') {
+    await printersApi.inferenceCommand(id, action)
+    const index = printers.value.findIndex(p => p.id === id)
+    if (index !== -1) {
+      printers.value[index].inference_paused = action === 'stop'
+    }
+  }
+
   return {
     printers,
     loading,
+    error,
     fetchAll,
     create,
     update,
     remove,
-    sendCommand
+    sendCommand,
+    toggleNotifications,
+    toggleInference
   }
 })
 

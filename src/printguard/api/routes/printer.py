@@ -12,7 +12,7 @@ from ...core.models import (
     ComponentConfig, ComponentInfo, PrinterUpdate
 )
 from ...core.database import get_db, AsyncSession
-from ...core.db_models import Printer, Component, PrinterComponentLink
+from ...core.db_models import Printer, Component, PrinterComponentLink, PrinterNotificationSubscription
 from ...core.model import get_model
 from ...core.inference import predict
 from ...providers import list_providers as get_available_providers, get_provider
@@ -88,7 +88,8 @@ async def _get_or_create_printer_instance(printer_id: str, db: AsyncSession) -> 
         inference_sensitivity=db_printer.inference_sensitivity,
         inference_majority_voting=db_printer.inference_majority_voting,
         inference_target_fps=db_printer.inference_target_fps,
-        detection_action=db_printer.detection_action
+        detection_action=db_printer.detection_action,
+        inference_paused=db_printer.inference_paused
     )
     instance = PrinterInstance(config=config)
     for role, db_comp in comp_map.items():
@@ -102,7 +103,7 @@ async def trigger_printer_action(printer_id: str, action: str):
     if action == "none":
         return
         
-    from ...core.database import SessionLocal
+    from ...core.database import async_session as SessionLocal
     async with SessionLocal() as db:
         instance = await _get_or_create_printer_instance(printer_id, db)
         if not instance or not instance.control:
@@ -142,7 +143,7 @@ async def get_provider_schema(
 async def register_printer(
     config: PrinterConfig, 
     db: AsyncSession = Depends(get_db),
-    _: any = Security(get_current_identity, scopes=["printer:write"])
+    user: any = Security(get_current_identity, scopes=["printer:write"])
 ) -> PrinterInfo:
     """Register a new modular printer."""
     db_printer = Printer(
@@ -190,7 +191,7 @@ async def register_printer(
             )
             db.add(link)
     await db.commit()
-    return await get_printer(db_printer.id, db, _)
+    return await get_printer(db_printer.id, db, user)
 
 
 @router.put("/{printer_id}", response_model=PrinterInfo)
@@ -198,7 +199,7 @@ async def update_printer(
     printer_id: str,
     config: PrinterUpdate,
     db: AsyncSession = Depends(get_db),
-    _: any = Security(get_current_identity, scopes=["printer:write"])
+    user: any = Security(get_current_identity, scopes=["printer:write"])
 ) -> PrinterInfo:
     """Update printer components."""
     result = await db.execute(
@@ -255,25 +256,25 @@ async def update_printer(
         source.settings.detection_action = db_printer.detection_action
         source.processor.settings = source.settings
 
-    return await get_printer(printer_id, db, _)
+    return await get_printer(printer_id, db, user)
 
 
 @router.get("", response_model=list[PrinterInfo])
 async def list_printers(
     db: AsyncSession = Depends(get_db),
-    _: any = Security(get_current_identity, scopes=["printer:read"])
+    user: any = Security(get_current_identity, scopes=["printer:read"])
 ) -> list[PrinterInfo]:
     """List all registered printers."""
     result = await db.execute(select(Printer.id))
     printer_ids = result.scalars().all()
-    return [await get_printer(pid, db, _) for pid in printer_ids]
+    return [await get_printer(pid, db, user) for pid in printer_ids]
 
 
 @router.get("/{printer_id}", response_model=PrinterInfo)
 async def get_printer(
     printer_id: str, 
     db: AsyncSession = Depends(get_db),
-    _: any = Security(get_current_identity, scopes=["printer:read"])
+    user: any = Security(get_current_identity, scopes=["printer:read"])
 ) -> PrinterInfo:
     """Get printer status."""
     instance = await _get_or_create_printer_instance(printer_id, db)
@@ -304,6 +305,19 @@ async def get_printer(
             entity_config=link.component.entity_config or {}
         ) for link in links
     }
+    # Check if user is subscribed to notifications for this printer
+    result = await db.execute(
+        select(PrinterNotificationSubscription).where(
+            PrinterNotificationSubscription.user_id == user.id,
+            PrinterNotificationSubscription.printer_id == printer_id
+        )
+    )
+    notifications_enabled = result.scalar_one_or_none() is not None
+    # Check if inference is paused
+    inference_paused = instance.config.inference_paused
+    source = stream_manager.get_source(printer_id)
+    if source and source.processor:
+        inference_paused = getattr(source.processor, "pause_inference", False)
     return PrinterInfo(
         id=printer_id,
         name=instance.config.name,
@@ -315,7 +329,9 @@ async def get_printer(
         inference_sensitivity=instance.config.inference_sensitivity,
         inference_majority_voting=instance.config.inference_majority_voting,
         inference_target_fps=instance.config.inference_target_fps,
-        detection_action=instance.config.detection_action
+        detection_action=instance.config.detection_action,
+        notifications_enabled=notifications_enabled,
+        inference_paused=inference_paused
     )
 
 
@@ -337,7 +353,8 @@ async def link_printer_stream(
             sensitivity=instance.config.inference_sensitivity,
             majority_voting=instance.config.inference_majority_voting,
             target_fps=instance.config.inference_target_fps,
-            detection_action=instance.config.detection_action
+            detection_action=instance.config.detection_action,
+            inference_paused=instance.config.inference_paused
         )
     
     if not instance.camera:
@@ -363,9 +380,20 @@ async def link_printer_stream(
     processor = await start_track_processing(track, predict, model_info, settings, session_id)
     
     from .printer import trigger_printer_action
-    async def on_defect(class_name: str, confidence: float):
+    from ...services.notifications import notify_defect
+    async def on_defect(class_name: str, confidence: float, screenshot_path: str = None):
         if settings.detection_action and settings.detection_action != "none":
             await trigger_printer_action(printer_id, settings.detection_action)
+        from ...core.database import async_session as SessionLocal
+        async with SessionLocal() as db_session:
+            res = await db_session.execute(select(Printer).where(Printer.id == printer_id))
+            db_p = res.scalar_one_or_none()
+            if db_p:
+                db_p.inference_paused = True
+                await db_session.commit()
+        
+        notify_defect(printer_id, class_name, confidence, screenshot_path)
+    
     processor.on_defect = on_defect
 
     if processor.relayed_track:
@@ -421,3 +449,30 @@ async def printer_command(
     elif command == "stop": await instance.control.stop()
     else: raise HTTPException(status_code=400, detail="Invalid command")
     return {"status": "ok", "command": command}
+
+
+@router.post("/{printer_id}/inference/{action}")
+async def printer_inference_command(
+    printer_id: str,
+    action: str,
+    db: AsyncSession = Depends(get_db),
+    _: any = Security(get_current_identity, scopes=["printer:write"])
+) -> dict:
+    """Start or stop inference for a printer."""
+    result = await db.execute(select(Printer).where(Printer.id == printer_id))
+    db_printer = result.scalar_one_or_none()
+    if not db_printer:
+        raise HTTPException(status_code=404, detail="Printer not found")
+
+    paused = action == "stop"
+    db_printer.inference_paused = paused
+    await db.commit()
+
+    if printer_id in _printers:
+        _printers[printer_id].config.inference_paused = paused
+
+    source = stream_manager.get_source(printer_id)
+    if source and source.processor:
+        source.processor.pause_inference = paused
+
+    return {"status": "ok", "action": action, "inference_paused": paused}

@@ -2,10 +2,12 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import LiveFeed from './LiveFeed.vue'
 import { usePrintersStore } from '../../store/printers'
-import { streamsApi } from '../../services/api'
+import { streamsApi, notificationsApi } from '../../services/api'
+import { subscribeUserToPush } from '../../services/notifications'
 import IconButton from '../ui/IconButton.vue'
+import Button from '../ui/Button.vue'
 import Badge from '../ui/Badge.vue'
-import { Play, Pause, Square, Settings, Trash2 } from 'lucide-vue-next'
+import { Play, Pause, Square, Settings, Trash2, Zap, ZapOff, Bell } from 'lucide-vue-next'
 import type { Printer } from '../../types'
 
 const props = defineProps<{
@@ -24,8 +26,15 @@ async function pollResults() {
   try {
     const response = await streamsApi.result(props.printer.id)
     prediction.value = response.data
+    
+    if (prediction.value.inference_paused !== undefined && 
+        prediction.value.inference_paused !== props.printer.inference_paused) {
+      const index = store.printers.findIndex(p => p.id === props.printer.id)
+      if (index !== -1) {
+        store.printers[index].inference_paused = prediction.value.inference_paused
+      }
+    }
   } catch (e) {
-    // Silently fail polling
   }
 }
 
@@ -54,13 +63,53 @@ async function handleDelete() {
     }
   }
 }
+
+async function toggleInference() {
+  const action = props.printer.inference_paused ? 'start' : 'stop'
+  try {
+    await store.toggleInference(props.printer.id, action)
+  } catch (e) {
+    alert(`Failed to ${action} inference`)
+  }
+}
+
+async function toggleNotifications() {
+  const enabled = !props.printer.notifications_enabled
+  try {
+    if (enabled) {
+      await subscribeUserToPush()
+    }
+    await store.toggleNotifications(props.printer.id, enabled)
+  } catch (e) {
+    alert('Failed to toggle notifications')
+  }
+}
+
+async function sendTestNotification() {
+  try {
+    await notificationsApi.test(props.printer.id)
+  } catch (e) {
+    alert('Failed to send test notification')
+  }
+}
 </script>
 
 <template>
   <div :class="$style.card">
     <div :class="$style.header">
       <div :class="$style.titleInfo">
-        <h3 :class="$style.name">{{ printer.name }}</h3>
+        <div :class="$style.nameRow">
+          <h3 :class="$style.name">{{ printer.name }}</h3>
+          <IconButton
+            :variant="printer.notifications_enabled ? 'primary' : 'ghost'"
+            size="xs"
+            :class="$style.inlineBell"
+            :title="printer.notifications_enabled ? 'Disable notifications' : 'Enable notifications'"
+            @click.stop="toggleNotifications"
+          >
+            <Bell :size="12" />
+          </IconButton>
+        </div>
         <Badge
           :variant="printer.status === 'printing' ? 'success' : printer.status === 'paused' ? 'warning' : printer.status === 'error' ? 'danger' : 'neutral'"
           size="sm"
@@ -68,14 +117,23 @@ async function handleDelete() {
           {{ printer.status }}
         </Badge>
       </div>
-      <div v-if="prediction && prediction.status === 'success'" :class="$style.inferenceWrapper">
-        <div :class="[$style.inference, $style[prediction.class_name]]">
-          <span :class="$style.icon">{{ prediction.class_name === 'defect' ? '⚠️' : '✅' }}</span>
-          <span :class="$style.text">{{ prediction.class_name }}</span>
-        </div>
-        <div v-if="prediction.actual_fps !== undefined" :class="$style.fpsMetric">
-          {{ prediction.actual_fps.toFixed(1) }} det/s
-        </div>
+      <div v-if="prediction" :class="$style.inferenceWrapper">
+        <template v-if="prediction.status === 'success'">
+          <div :class="[$style.inference, $style[prediction.class_name]]">
+            <span :class="$style.icon">{{ prediction.class_name === 'defect' ? '⚠️' : '✅' }}</span>
+            <span :class="$style.text">{{ prediction.class_name }}</span>
+          </div>
+          <div :class="$style.fpsMetric">
+            {{ (printer.inference_paused || prediction.inference_paused) ? '-' : (prediction.actual_fps?.toFixed(1) || '0.0') }} det/s
+          </div>
+        </template>
+        <template v-else-if="prediction.status === 'waiting'">
+          <div :class="[$style.inference, $style.waiting]">
+            <span :class="$style.icon">⏳</span>
+            <span :class="$style.text">Waiting...</span>
+          </div>
+          <div :class="$style.fpsMetric">- det/s</div>
+        </template>
       </div>
     </div>
 
@@ -112,6 +170,18 @@ async function handleDelete() {
         >
           <Square :size="16" />
         </IconButton>
+
+        <div :class="$style.divider"></div>
+
+        <Button
+          :variant="printer.inference_paused ? 'primary' : 'secondary'"
+          size="sm"
+          @click="toggleInference"
+        >
+          <Zap v-if="printer.inference_paused" :size="14" />
+          <ZapOff v-else :size="14" />
+          <span>{{ printer.inference_paused ? 'Start Inference' : 'Stop Inference' }}</span>
+        </Button>
       </div>
 
       <div :class="$style.cardActions">
@@ -122,6 +192,15 @@ async function handleDelete() {
           @click="emit('edit', printer)"
         >
           <Settings :size="16" />
+        </IconButton>
+        <IconButton
+          v-if="printer.notifications_enabled"
+          variant="ghost"
+          size="sm"
+          title="Test Notification"
+          @click="sendTestNotification"
+        >
+          <Bell :size="16" style="color: var(--primary)" />
         </IconButton>
         <IconButton
           variant="danger"
@@ -149,6 +228,13 @@ async function handleDelete() {
   height: auto;
 }
 
+.divider {
+  width: 1px;
+  height: 24px;
+  background-color: var(--border-subtle);
+  margin: 0 var(--space-1);
+}
+
 .card:hover {
   box-shadow: var(--shadow-lg);
 }
@@ -168,6 +254,20 @@ async function handleDelete() {
   gap: var(--space-1);
   flex: 1;
   overflow: hidden;
+}
+
+.nameRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.inlineBell {
+  padding: 2px !important;
+  height: 20px !important;
+  width: 20px !important;
+  min-height: 20px !important;
+  border-radius: var(--radius-md) !important;
 }
 
 .name {
@@ -209,6 +309,12 @@ async function handleDelete() {
 .inference.normal {
   background-color: var(--success-bg);
   color: var(--success);
+}
+
+.inference.waiting {
+  background-color: var(--bg-secondary);
+  color: var(--text-secondary);
+  opacity: 0.8;
 }
 
 .inference.defect {

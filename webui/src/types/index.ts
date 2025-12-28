@@ -49,6 +49,8 @@ export interface Printer {
   inference_majority_voting: number
   inference_target_fps: number
   detection_action: string
+  notifications_enabled: boolean
+  inference_paused: boolean
 }
 
 export interface PrinterCreate {

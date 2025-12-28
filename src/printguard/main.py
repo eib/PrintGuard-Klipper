@@ -69,6 +69,10 @@ webui_dist = os.path.join(os.getcwd(), "webui", "dist")
 if os.path.exists(webui_dist):
     app.mount("/", StaticFiles(directory=webui_dist, html=True), name="webui")
 
+screenshots_dir = os.path.join(os.getcwd(), "screenshots")
+os.makedirs(screenshots_dir, exist_ok=True)
+app.mount("/screenshots", StaticFiles(directory=screenshots_dir), name="screenshots")
+
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request, exc):
