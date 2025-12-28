@@ -36,9 +36,18 @@ WORKDIR /app
 COPY pyproject.toml .
 COPY src/printguard/requirements.txt src/printguard/requirements.txt
 
-# Install Python dependencies
+# Copy printguard-shared (required for local dependency)
+COPY printguard-shared/ ./printguard-shared/
+
+# Install printguard-shared first
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir .
+    pip install --no-cache-dir ./printguard-shared/
+
+# Copy source code (needed to build the main package)
+COPY src/ ./src/
+
+# Install Python dependencies and main package
+RUN pip install --no-cache-dir .
 
 # Copy built WebUI from Stage 1
 COPY --from=webui-builder /app/webui/dist ./webui/dist
