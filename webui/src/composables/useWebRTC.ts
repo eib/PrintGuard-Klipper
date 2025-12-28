@@ -79,7 +79,8 @@ export function useWebRTC() {
 
       const response = await streamsApi.view(sessionId, {
         sdp: pc.value?.localDescription?.sdp,
-        type: pc.value?.localDescription?.type
+        type: pc.value?.localDescription?.type,
+        session_id: `view-${Math.random().toString(36).slice(2, 9)}`
       })
 
       await pc.value.setRemoteDescription(new RTCSessionDescription(response.data))

@@ -11,8 +11,10 @@ const props = defineProps<{
   printerId?: string
 }>()
 
-const { currentStream, startPreview, stopPreview } = useDevices()
+const { devices, currentStream, startPreview, stopPreview, fetchDevices, loadingDevices } = useDevices()
+const { push } = useWebRTC()
 const sessionId = ref<string | null>(null)
+const isProducer = ref(false)
 const error = ref<string | null>(null)
 const loading = ref(false)
 const videoRef = ref<HTMLVideoElement | null>(null)
@@ -32,12 +34,24 @@ async function initStream() {
     
     if (isBrowserWebcam) {
       const deviceId = props.component.entity_config?.device_id
-      if (deviceId) {
+      if (!deviceId) {
+        error.value = 'No device ID configured'
+        return
+      }
+      if (devices.value.length === 0 && !loadingDevices.value) {
+        await fetchDevices()
+      }
+      const hasDevice = devices.value.some(d => d.deviceId === deviceId)
+      if (hasDevice) {
+        isProducer.value = true
         await startPreview(deviceId)
       } else {
-        error.value = 'No device ID configured'
+        isProducer.value = false
+        const id = props.printerId || props.component.id
+        sessionId.value = id
       }
     } else {
+      isProducer.value = false
       const id = `stream-${props.component.id}-${Math.random().toString(36).slice(2, 9)}`
       if (props.printerId) {
         await printersApi.stream(props.printerId, id)
@@ -59,7 +73,14 @@ function cleanup() {
   sessionId.value = null
 }
 
-onMounted(initStream)
+function onStreamError(err: string) {
+  console.warn('Stream viewer error:', err)
+}
+
+onMounted(async () => {
+  await fetchDevices()
+  await initStream()
+})
 onUnmounted(cleanup)
 
 watch(() => props.component?.id, (newId, oldId) => {
@@ -74,13 +95,20 @@ const emit = defineEmits<{
 }>()
 
 watch(currentStream, async (stream) => {
-  if (stream && props.component?.provider === 'webcam' && props.component?.entity_config?.type === 'browser') {
+  if (stream && isProducer.value && props.component) {
     await nextTick()
     if (videoRef.value) {
       videoRef.value.srcObject = stream
       videoRef.value.play().catch(console.error)
     }
-    emit('stream-ready', stream)
+    
+    const id = props.printerId || props.component.id
+    try {
+      await push(id, stream, `${props.component.name || 'Camera'} (Browser)`, props.printerId)
+      emit('stream-ready', stream)
+    } catch (e) {
+      console.error('Failed to push stream:', e)
+    }
   }
 })
 </script>
@@ -98,9 +126,9 @@ watch(currentStream, async (stream) => {
     </div>
     
     <div v-else :class="$style.content">
-      <!-- Browser Webcam -->
+      <!-- Local Producer Feed -->
       <video 
-        v-if="component?.provider === 'webcam' && component?.entity_config?.type === 'browser'"
+        v-if="isProducer"
         ref="videoRef"
         autoplay 
         playsinline 
@@ -108,12 +136,14 @@ watch(currentStream, async (stream) => {
         :class="$style.video"
       ></video>
       
-      <!-- Remote Stream -->
-      <StreamPreview 
-        v-else-if="sessionId" 
-        :sessionId="sessionId" 
-        :class="$style.stream"
-      />
+      <!-- Remote Stream (Pulling from another browser or source) -->
+      <div v-else-if="sessionId" :class="$style.viewerContainer">
+        <StreamPreview 
+          :sessionId="sessionId" 
+          :class="$style.stream"
+          @error="onStreamError"
+        />
+      </div>
       
       <div v-else :class="$style.placeholder">
         No camera selected
@@ -143,6 +173,12 @@ watch(currentStream, async (stream) => {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.viewerContainer {
+  position: relative;
+  width: 100%;
+  height: 100%;
 }
 
 .overlay, .placeholder {

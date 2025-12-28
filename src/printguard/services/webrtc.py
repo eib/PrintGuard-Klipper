@@ -248,10 +248,9 @@ async def create_peer_connection(
     pcs.add(pc)
     processor = VideoProcessor(predict_fn, model_info, settings, session_id)
 
-    @pc.on("connectionstatechanged")
+    @pc.on("connectionstatechange")
     async def on_state_change():
-        if pc.connectionState == "failed":
-            await pc.close()
+        if pc.connectionState in ["closed", "failed"]:
             pcs.discard(pc)
 
     @pc.on("datachannel")
@@ -294,10 +293,9 @@ async def create_viewer_connection(
     pc = RTCPeerConnection()
     pcs.add(pc)
 
-    @pc.on("connectionstatechanged")
+    @pc.on("connectionstatechange")
     async def on_state_change():
-        if pc.connectionState == "failed":
-            await pc.close()
+        if pc.connectionState in ["closed", "failed"]:
             pcs.discard(pc)
 
     if processor.relayed_track:

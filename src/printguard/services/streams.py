@@ -48,9 +48,18 @@ class StreamManager:
             logger.warning(f"Source {source_id} already registered, overwriting.")
             await self.close_source(source_id)
         
-        self._sources[source_id] = SourceStream(
+        source = SourceStream(
             source_id, track, processor, pc, device_name, settings, printer_id
         )
+        self._sources[source_id] = source
+        
+        if pc:
+            @pc.on("connectionstatechange")
+            async def on_producer_state_change():
+                if pc.connectionState in ["closed", "failed"]:
+                    logger.info(f"Producer for source {source_id} disconnected ({pc.connectionState}). Closing source.")
+                    await self.close_source(source_id)
+
         logger.info(f"Source {source_id} registered successfully.")
 
     def list_sources(self) -> list[SourceStream]:
@@ -86,7 +95,7 @@ class StreamManager:
         source.subscribers.add(pc)
         logger.debug(f"Added subscriber to source {source_id}. Total: {len(source.subscribers)}")
 
-        @pc.on("connectionstatechanged")
+        @pc.on("connectionstatechange")
         async def on_state_change():
             if pc.connectionState in ["closed", "failed"]:
                 await self.remove_subscriber(source_id, pc)
@@ -98,8 +107,12 @@ class StreamManager:
             return
         source.subscribers.discard(pc)
         logger.debug(f"Removed subscriber from source {source_id}. Remaining: {len(source.subscribers)}")
-        if not source.subscribers:
-            await self.close_source(source_id)
+        if source.subscribers:
+            return
+        if source.pc and source.pc.connectionState not in ["closed", "failed"]:
+            logger.debug(f"Source {source_id} has no subscribers but producer is still connected. Keeping alive.")
+            return
+        await self.close_source(source_id)
 
     async def close_source(self, source_id: str):
         """Close a source and stop its processor."""

@@ -6,7 +6,20 @@ const props = defineProps<{
   sessionId?: string
 }>()
 
+const emit = defineEmits<{
+  (e: 'error', error: string): void
+  (e: 'connected'): void
+}>()
+
 const { videoRef, connected, error, latestResult, connect, disconnect } = useWebRTC()
+
+watch(error, (newErr) => {
+  if (newErr) emit('error', newErr)
+})
+
+watch(connected, (isConn) => {
+  if (isConn) emit('connected')
+})
 
 watch(() => props.sessionId, (newId) => {
   if (newId) {

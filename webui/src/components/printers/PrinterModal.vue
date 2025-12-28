@@ -151,6 +151,7 @@ watch(() => formData.value.components.control, (newControl) => {
         <ComponentSelector
           type="camera"
           v-model="formData.components.camera"
+          :printerId="printer?.id"
           required
           @add-new="openAddNew('camera')"
         />

@@ -3,9 +3,11 @@ import { ref, onMounted, onUnmounted } from 'vue'
 export function useDevices() {
   const devices = ref<MediaDeviceInfo[]>([])
   const currentStream = ref<MediaStream | null>(null)
+  const loadingDevices = ref(false)
   const error = ref<string | null>(null)
 
   async function fetchDevices() {
+    loadingDevices.value = true
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true })
       stream.getTracks().forEach(track => track.stop())
@@ -14,6 +16,8 @@ export function useDevices() {
     } catch (e: any) {
       error.value = 'Permission denied or no camera found'
       console.error('Error fetching devices:', e)
+    } finally {
+      loadingDevices.value = false
     }
   }
 
@@ -43,6 +47,7 @@ export function useDevices() {
   return {
     devices,
     currentStream,
+    loadingDevices,
     error,
     fetchDevices,
     startPreview,

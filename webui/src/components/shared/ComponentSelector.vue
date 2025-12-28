@@ -12,6 +12,7 @@ const $style = useCssModule()
 const props = defineProps<{
   type: 'camera' | 'control' | 'status'
   modelValue: string | null
+  printerId?: string
   required?: boolean
   showAddNew?: boolean
   placeholder?: string
@@ -75,7 +76,7 @@ onUnmounted(() => {
   <div :class="$style.wrapper" ref="dropdownRef">
     <!-- Camera Feed Preview Above -->
     <div v-if="type === 'camera'" :class="$style.feedPreview">
-      <CameraFeed :component="selectedComponent" />
+      <CameraFeed :component="selectedComponent" :printerId="printerId" />
     </div>
 
     <div 

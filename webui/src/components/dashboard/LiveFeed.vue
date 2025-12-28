@@ -9,13 +9,6 @@ const props = defineProps<{
   camera?: ComponentInfo
 }>()
 
-const { push } = useWebRTC()
-
-async function handleStreamReady(stream: MediaStream) {
-  if (props.camera) {
-    await push(props.printerId, stream, `${props.camera.name || 'Camera'} (Browser)`, props.printerId)
-  }
-}
 </script>
 
 <template>
@@ -24,7 +17,6 @@ async function handleStreamReady(stream: MediaStream) {
       v-if="camera" 
       :component="(camera as unknown as Component)" 
       :printerId="printerId"
-      @stream-ready="handleStreamReady"
     />
     <div v-else :class="$style.placeholder">
       No camera configured
