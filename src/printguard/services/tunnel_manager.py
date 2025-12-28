@@ -119,7 +119,17 @@ class CloudflareManager:
 
     async def list_accounts(self) -> List[CFAccount]:
         results = await self.list_paginated("GET", "accounts")
-        return [CFAccount(id=a["id"], name=a["name"]) for a in results]
+        accounts = [CFAccount(id=a["id"], name=a["name"]) for a in results]
+        if not accounts:
+            logger.info("No accounts found via /accounts, attempting to derive from zones")
+            zones_raw = await self.list_paginated("GET", "zones")
+            seen_accounts = {}
+            for z in zones_raw:
+                acc = z.get("account")
+                if acc and acc.get("id") not in seen_accounts:
+                    seen_accounts[acc["id"]] = acc.get("name") or "Unnamed Account"
+            accounts = [CFAccount(id=aid, name=aname) for aid, aname in seen_accounts.items()]
+        return accounts
 
     async def list_zones(self, name: Optional[str] = None) -> List[CFZone]:
         params = {"name": name} if name else {}
