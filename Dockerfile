@@ -56,10 +56,10 @@ RUN pip install --no-cache-dir .
 # Copy built WebUI from Stage 1
 COPY --from=webui-builder /app/webui/dist ./webui/dist
 
-# Copy the rest of the application
+# Copy any remaining files (excluding what's in .dockerignore)
 COPY . .
 
-# Install the project in editable mode or just ensure scripts are installed
+# Final installation to ensure all entry points are set up
 RUN pip install --no-cache-dir .
 
 # Expose the port the app runs on
