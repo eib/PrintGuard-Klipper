@@ -9,7 +9,7 @@ PrintGuard is configured via environment variables or `.env` file.
 | `HOST` | Server bind address | `0.0.0.0` |
 | `PORT` | Server port | `8000` |
 | `DEBUG` | Enable debug mode | `false` |
-| `WEBUI_PORT` | WebUI port (used for tunnels / dev defaults) | `5173` |
+| `WEBUI_PORT` | WebUI port (used for tunnels / dev defaults) | `8000` (`5173` in local dev) |
 
 ## Security
 

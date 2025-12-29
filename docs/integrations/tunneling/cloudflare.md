@@ -32,7 +32,8 @@ Use Cloudflare Tunnel to expose your PrintGuard WebUI/API securely with a stable
 
 ## Notes
 
-- Cloudflare tunnels are configured to forward to the WebUI port (`webui_port`, default `5173`).
+- Cloudflare tunnels are configured to forward to the WebUI port (`webui_port`).
+- Default is `8000` (production/docker), or `5173` if running the Vite dev server locally.
 - Successful setup persists tunnel settings to `.env` so they survive restarts.
 
 ## Setup

@@ -9,6 +9,7 @@ services:
     environment:
       - HOST=${HOST:-0.0.0.0}
       - PORT=${PORT:-8000}
+      - WEBUI_PORT=${PORT:-8000}
       - TUNNEL_PROVIDER=${TUNNEL_PROVIDER:-local}
       - CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN:-}
       - CLOUDFLARE_DOMAIN=${CLOUDFLARE_DOMAIN:-}

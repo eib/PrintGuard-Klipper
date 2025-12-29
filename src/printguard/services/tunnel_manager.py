@@ -46,13 +46,13 @@ async def run_tunnel(tunnel_id: str, tunnel_secret: str, account_id: str, port: 
         token = base64.b64encode(json.dumps(token_data).encode()).decode()
         cmd = [
             "cloudflared", "tunnel", "--no-autoupdate", "run",
-            "--url", f"http://localhost:{port}",
+            "--url", f"http://127.0.0.1:{port}",
             "--token", token
         ]
     else:
         cmd = [
             "cloudflared", "tunnel", "--no-autoupdate", "run",
-            "--url", f"http://localhost:{port}",
+            "--url", f"http://127.0.0.1:{port}",
             tunnel_id
         ]
         
@@ -229,11 +229,34 @@ class CloudflareManager:
             
             raise e
 
+    async def update_tunnel_configuration(self, account_id: str, tunnel_id: str, hostname: str, port: int = 8000):
+        """Update the tunnel configuration (ingress rules) for remote management."""
+        payload = {
+            "config": {
+                "ingress": [
+                    {
+                        "hostname": hostname,
+                        "service": f"http://127.0.0.1:{port}"
+                    },
+                    {
+                        "service": "http_status:404"
+                    }
+                ]
+            }
+        }
+        try:
+            await self._request("PUT", f"accounts/{account_id}/cfd_tunnel/{tunnel_id}/configurations", json=payload)
+            logger.info(f"Updated Cloudflare tunnel configuration for {hostname} -> 127.0.0.1:{port}")
+        except Exception as e:
+            logger.error(f"Failed to update Cloudflare tunnel configuration: {e}")
+            raise e
+
 async def setup_cloudflare_tunnel(
     api_token: str, 
     domain_name: str, 
     tunnel_name: str,
-    subdomain: str = "camera"
+    subdomain: str = "camera",
+    port: int = 8000
 ) -> Optional[Tuple[str, str]]:
     """Set up a Cloudflare tunnel and CNAME record automatically."""
     if not is_cloudflared_installed():
@@ -259,8 +282,12 @@ async def setup_cloudflare_tunnel(
         logger.info(f"Creating Cloudflare tunnel: {tunnel_name}")
         tunnel = await manager.create_tunnel(account_id, tunnel_name)
         # 4. Create the CNAME Record
-        logger.info(f"Creating DNS record: {subdomain}.{domain_name} -> {tunnel.id}.cfargotunnel.com")
+        hostname = f"{subdomain}.{domain_name}"
+        logger.info(f"Creating DNS record: {hostname} -> {tunnel.id}.cfargotunnel.com")
         await manager.create_dns_record(zone_id, subdomain, tunnel.id)
+        # 5. Update Tunnel Configuration (Ingress Rules)
+        logger.info(f"Updating tunnel ingress rules for {hostname}")
+        await manager.update_tunnel_configuration(account_id, tunnel.id, hostname, port)
         return tunnel.id, tunnel.tunnel_secret
     except Exception as e:
         logger.exception(f"Failed to set up Cloudflare tunnel: {e}")
@@ -332,6 +359,15 @@ async def setup_active_tunnel(app, settings: Settings):
             tunnel_secret = settings.cloudflare_tunnel_secret
             account_id = settings.cloudflare_account_id
             
+            # Update configuration on start to ensure it matches current settings
+            if settings.cloudflare_api_token and settings.cloudflare_domain:
+                try:
+                    manager = CloudflareManager(settings.cloudflare_api_token)
+                    hostname = f"{settings.cloudflare_subdomain}.{settings.cloudflare_domain}"
+                    await manager.update_tunnel_configuration(account_id, tunnel_id, hostname, settings.webui_port)
+                except Exception as e:
+                    logger.warning(f"Could not update Cloudflare tunnel configuration on start: {e}")
+
             process = await run_tunnel(tunnel_id, tunnel_secret, account_id, settings.webui_port)
             if process:
                 app.state.tunnel_process = process
@@ -352,7 +388,8 @@ async def setup_active_tunnel(app, settings: Settings):
             api_token=settings.cloudflare_api_token,
             domain_name=settings.cloudflare_domain,
             tunnel_name=settings.cloudflare_tunnel_name,
-            subdomain=settings.cloudflare_subdomain
+            subdomain=settings.cloudflare_subdomain,
+            port=settings.webui_port
         )
         if tunnel_info:
             tunnel_id, tunnel_secret = tunnel_info

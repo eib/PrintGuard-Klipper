@@ -24,7 +24,8 @@ Use ngrok to expose your PrintGuard WebUI/API securely over the internet with mi
 
 ## Notes
 
-- ngrok is configured to forward to the WebUI port (`webui_port`, default `5173`).
+- ngrok is configured to forward to the WebUI port (`webui_port`).
+- Default is `8000` (production/docker), or `5173` if running the Vite dev server locally.
 
 ## Setup
 

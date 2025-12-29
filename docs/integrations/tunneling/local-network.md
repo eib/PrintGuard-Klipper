@@ -12,8 +12,10 @@ Local mode is the simplest and recommended default: you access PrintGuard from t
 
 ## How to access
 
-- WebUI: `http://<server-ip>:5173` (default)
+- WebUI: `http://<server-ip>:8000` (default in production/docker)
 - API: `http://<server-ip>:8000/api` (default)
+
+> Note: If running locally for development, the WebUI defaults to port `5173`.
 
 > Ports are configurable; see `src/printguard/core/config.py` and your `.env`.
 

@@ -99,9 +99,13 @@ async def create_cf_tunnel(
         # 3. Create or update the DNS Record
         await manager.create_dns_record(body.zone_id, full_dns_name, tunnel.id, overwrite=body.overwrite_dns)
         
+        # 4. Update the tunnel configuration (ingress rules)
+        logger.info(f"Updating tunnel ingress rules for {full_dns_name} -> 127.0.0.1:{get_settings().webui_port}")
+        await manager.update_tunnel_configuration(body.account_id, tunnel.id, full_dns_name, get_settings().webui_port)
+
         url = f"https://{full_dns_name}"
         
-        # 4. Update settings and start the tunnel
+        # 5. Update settings and start the tunnel
         settings = get_settings()
         settings.tunnel_provider = TunnelProvider.CLOUDFLARE
         settings.cloudflare_api_token = api_token
