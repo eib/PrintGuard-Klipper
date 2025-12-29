@@ -50,8 +50,6 @@ custom_components/
 hacs.json
 docs/
 mkdocs.yml
-README.md
-LICENSE.md
 .vapid_keys.json
 
 # WebUI
