@@ -8,7 +8,6 @@ import Input from '../ui/Input.vue'
 import Select from '../ui/Select.vue'
 import { usePrintersStore } from '../../store/printers'
 import { useComponentsStore } from '../../store/components'
-import { subscribeUserToPush } from '../../services/notifications'
 import type { Printer, PrinterCreate } from '../../types'
 
 const props = defineProps<{
@@ -108,9 +107,6 @@ async function handleSave() {
       savedPrinter = await store.create(formData.value)
     }
 
-    if (notificationsEnabled.value) {
-      await subscribeUserToPush()
-    }
     await store.toggleNotifications(savedPrinter.id, notificationsEnabled.value)
 
     emit('close')

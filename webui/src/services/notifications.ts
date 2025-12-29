@@ -33,62 +33,91 @@ export async function registerServiceWorker() {
       return registration
     } catch (error) {
       console.error('Service Worker registration failed:', error)
+      throw new Error('Service Worker registration failed')
     }
+  }
+  throw new Error('Service Worker not supported in this browser')
+}
+
+export async function getSubscription() {
+  if (!('serviceWorker' in navigator)) return null
+  const registration = await navigator.serviceWorker.getRegistration()
+  if (!registration) return null
+  return await registration.pushManager.getSubscription()
+}
+
+export async function validateSubscription(subscription: PushSubscription | null): Promise<boolean> {
+  if (!subscription) return false
+
+  try {
+    const vapidKeyResponse = await notificationsApi.getVapidPublicKey()
+    const vapidPublicKey = vapidKeyResponse.data.public_key
+
+    if (!vapidPublicKey) return false
+
+    const serverKey = urlBase64ToUint8Array(vapidPublicKey)
+    const subKey = new Uint8Array(subscription.options.applicationServerKey as ArrayBuffer)
+
+    if (serverKey.length !== subKey.length) return false
+    for (let i = 0; i < serverKey.length; i++) {
+      if (serverKey[i] !== subKey[i]) return false
+    }
+
+    return true
+  } catch (error) {
+    console.error('Failed to validate subscription:', error)
+    return false
+  }
+}
+
+export async function unsubscribe() {
+  const subscription = await getSubscription()
+  if (subscription) {
+    try {
+      await notificationsApi.unsubscribe(subscription.toJSON())
+    } catch (e) {
+      console.warn('Failed to notify backend of unsubscription', e)
+    }
+    await subscription.unsubscribe()
   }
 }
 
 export async function subscribeUserToPush() {
   const registration = await registerServiceWorker()
   if (!registration) {
-    console.error('Service Worker not available')
-    return
+    throw new Error('Service Worker not available')
   }
 
-  try {
-    const permission = await Notification.requestPermission()
-    if (permission !== 'granted') {
-      console.warn('Notification permission not granted')
-      alert('You need to allow notifications to use this feature.')
-      return
-    }
-
-    const vapidKeyResponse = await notificationsApi.getVapidPublicKey()
-    const vapidPublicKey = vapidKeyResponse.data.public_key
-
-    if (!vapidPublicKey) {
-      alert('Push notifications are not configured on the server (VAPID keys missing).')
-      console.error('VAPID public key not found')
-      return
-    }
-
-    console.log('Subscribing to push with VAPID key...')
-    const subscription = await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(vapidPublicKey)
-    })
-
-    console.log('Got browser subscription, registering with backend...')
-    await notificationsApi.subscribe(subscription.toJSON())
-    console.log('User subscribed to push notifications successfully')
-  } catch (error) {
-    console.error('Failed to subscribe user to push notifications:', error)
-    alert('Failed to subscribe to notifications. Check console for details.')
+  const permission = await Notification.requestPermission()
+  if (permission !== 'granted') {
+    throw new Error('PERMISSION_DENIED')
   }
+
+  const vapidKeyResponse = await notificationsApi.getVapidPublicKey()
+  const vapidPublicKey = vapidKeyResponse.data.public_key
+
+  if (!vapidPublicKey) {
+    throw new Error('VAPID_MISSING')
+  }
+
+  console.log('Subscribing to push with VAPID key...')
+  const subscription = await registration.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: urlBase64ToUint8Array(vapidPublicKey)
+  })
+
+  console.log('Got browser subscription, registering with backend...')
+  await notificationsApi.subscribe(subscription.toJSON())
+  console.log('User subscribed to push notifications successfully')
+  return subscription
 }
 
 export async function isSubscribed() {
-  if (!('serviceWorker' in navigator)) return false
-  const registration = await navigator.serviceWorker.getRegistration()
-  if (!registration) return false
-  const subscription = await registration.pushManager.getSubscription()
+  const subscription = await getSubscription()
   return !!subscription
 }
 
 export async function getPushEndpoint() {
-  if (!('serviceWorker' in navigator)) return null
-  const registration = await navigator.serviceWorker.getRegistration()
-  if (!registration) return null
-  const subscription = await registration.pushManager.getSubscription()
+  const subscription = await getSubscription()
   return subscription?.endpoint || null
 }
-

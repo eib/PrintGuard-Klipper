@@ -4,8 +4,9 @@ import { RouterLink, RouterView } from 'vue-router'
 import { useAuthStore } from './store/auth'
 import { useSystemStore } from './store/system'
 import { useTheme } from './composables/useTheme'
-import { isSubscribed, subscribeUserToPush } from './services/notifications'
+import { getSubscription, validateSubscription, unsubscribe } from './services/notifications'
 import ConnectionError from './components/shared/ConnectionError.vue'
+import NotificationPrompt from './components/shared/NotificationPrompt.vue'
 import ThemeToggle from './components/ui/ThemeToggle.vue'
 import { Menu, X } from 'lucide-vue-next'
 
@@ -13,17 +14,28 @@ const auth = useAuthStore()
 const system = useSystemStore()
 const { initTheme } = useTheme()
 const mobileMenuOpen = ref(false)
+const showNotificationPrompt = ref(false)
 
 initTheme()
 
-watch(() => auth.isAuthenticated, async (authenticated) => {
-  if (authenticated) {
-    const subscribed = await isSubscribed()
-    if (!subscribed) {
-      await subscribeUserToPush()
-    }
+async function checkNotifications() {
+  if (!auth.isAuthenticated) {
+    showNotificationPrompt.value = false
+    return
   }
-}, { immediate: true })
+
+  const sub = await getSubscription()
+  const isValid = await validateSubscription(sub)
+  
+  if (!isValid) {
+    if (sub) await unsubscribe()
+    showNotificationPrompt.value = true
+  } else {
+    showNotificationPrompt.value = false
+  }
+}
+
+watch(() => auth.isAuthenticated, checkNotifications, { immediate: true })
 
 function reload() {
   window.location.reload()
@@ -98,6 +110,11 @@ function closeMobileMenu() {
           <RouterView />
         </div>
       </main>
+      
+      <NotificationPrompt
+        :show="showNotificationPrompt"
+        @success="showNotificationPrompt = false"
+      />
     </template>
   </div>
 </template>
