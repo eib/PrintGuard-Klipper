@@ -63,12 +63,14 @@ The application will be available at `http://localhost:8000`.
 
 #### Using Docker directly
 
-```bash
-git clone https://github.com/oliverbravery/PrintGuard.git
-cd PrintGuard
+To build and run the image locally for testing:
 
+```bash
 # Build the image
 docker build -t printguard:local .
+
+# Stop and remove existing container if it exists
+docker stop printguard 2>/dev/null; docker rm printguard 2>/dev/null
 
 # Run the container
 docker run -d \
