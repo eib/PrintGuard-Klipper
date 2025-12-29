@@ -97,3 +97,26 @@ docker run -d \
 - On first run, PrintGuard initializes the SQLite database and prints an auto-generated `admin` password to the server logs.
 - If you build the WebUI (`webui/dist`), the backend can serve it directly (see `src/printguard/main.py`).
 
+## Home Assistant Integration Development
+
+To develop and test the PrintGuard Home Assistant custom component, you can run a local Home Assistant instance that mounts the `custom_components` directory from this repository.
+
+Run the following command from the root of the PrintGuard repository:
+
+```bash
+docker run -d \
+  --name homeassistant \
+  --privileged \
+  --restart=unless-stopped \
+  -v "$(pwd)/config:/config" \
+  -v "$(pwd)/custom_components:/config/custom_components" \
+  -e TZ=Europe/London \
+  -p 8123:8123 \
+  ghcr.io/home-assistant/home-assistant:stable
+```
+
+This setup allows you to:
+1. Make changes to files in `custom_components/printguard/` on your host machine.
+2. Restart Home Assistant to apply those changes.
+3. Test the integration directly within a real Home Assistant environment.
+

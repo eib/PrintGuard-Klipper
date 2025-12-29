@@ -19,3 +19,4 @@ webui/dist/
 screenshots/
 dist/
 !.github
+config/

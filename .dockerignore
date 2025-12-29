@@ -69,3 +69,4 @@ model/
 Dockerfile
 docker-compose.yml
 .dockerignore
+config/
