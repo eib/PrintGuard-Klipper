@@ -61,6 +61,13 @@ async def create_connection(
     _: any = Security(get_current_identity, scopes=["printer:write"])
 ):
     """Create a new connection."""
+    prov_cls = get_provider(request.provider)
+    if not prov_cls:
+        raise HTTPException(status_code=400, detail=f"Provider {request.provider} not found")
+    
+    if not await prov_cls.validate_connection(request.config):
+        raise HTTPException(status_code=400, detail="Connection validation failed. Please check your credentials and URL.")
+
     connection = Connection(
         name=request.name,
         provider=request.provider,
@@ -92,6 +99,12 @@ async def update_connection(
     if request.name is not None:
         connection.name = request.name
     if request.config is not None:
+        prov_cls = get_provider(connection.provider)
+        if prov_cls:
+            temp_config = {**connection.config, **request.config}
+            if not await prov_cls.validate_connection(temp_config):
+                raise HTTPException(status_code=400, detail="Connection validation failed. Please check your credentials and URL.")
+        
         connection.config.update(request.config)
         
     await db.commit()

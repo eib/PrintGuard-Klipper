@@ -1,3 +1,4 @@
+import { ref } from 'vue'
 import { defineStore } from 'pinia'
 import { connectionsApi } from '../services/api'
 import { useCrudStore } from '../composables/useCrudStore'
@@ -8,13 +9,46 @@ export const useConnectionsStore = defineStore('connections', () => {
     connectionsApi
   )
 
+  const healthStatuses = ref<Record<string, 'healthy' | 'unhealthy' | 'unknown' | 'loading'>>({})
+
+  async function fetchHealth(id: string) {
+    healthStatuses.value[id] = 'loading'
+    try {
+      const response = await connectionsApi.health(id)
+      healthStatuses.value[id] = response.data.healthy ? 'healthy' : 'unhealthy'
+    } catch (e) {
+      healthStatuses.value[id] = 'unhealthy'
+    }
+  }
+
+  async function fetchAll() {
+    await crud.fetchAll()
+    crud.items.value.forEach(conn => {
+      fetchHealth(conn.id)
+    })
+  }
+
+  async function create(data: ConnectionCreate) {
+    const conn = await crud.create(data)
+    fetchHealth(conn.id)
+    return conn
+  }
+
+  async function update(id: string, data: ConnectionUpdate) {
+    const conn = await crud.update(id, data)
+    fetchHealth(conn.id)
+    return conn
+  }
+
   return {
     connections: crud.items,
     loading: crud.loading,
     error: crud.error,
-    fetchAll: crud.fetchAll,
-    create: crud.create,
-    update: crud.update,
+    healthStatuses,
+    fetchAll,
+    fetchHealth,
+    create,
+    update,
     remove: crud.remove
   }
 })

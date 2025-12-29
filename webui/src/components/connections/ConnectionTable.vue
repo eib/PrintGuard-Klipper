@@ -2,6 +2,7 @@
 import HealthBadge from '../shared/HealthBadge.vue'
 import IconButton from '../ui/IconButton.vue'
 import { Edit, Trash2 } from 'lucide-vue-next'
+import { useConnectionsStore } from '../../store/connections'
 import type { Connection } from '../../types'
 
 defineProps<{
@@ -12,6 +13,8 @@ const emit = defineEmits<{
   (e: 'edit', connection: Connection): void
   (e: 'delete', connection: Connection): void
 }>()
+
+const store = useConnectionsStore()
 </script>
 
 <template>
@@ -35,7 +38,7 @@ const emit = defineEmits<{
             </td>
             <td data-label="Host / URL" :class="$style.url">{{ conn.config.hass_url || conn.config.host || 'N/A' }}</td>
             <td data-label="Health">
-              <HealthBadge status="healthy" />
+              <HealthBadge :status="store.healthStatuses[conn.id] || 'unknown'" />
             </td>
             <td data-label="Actions">
               <div class="table-actions">
