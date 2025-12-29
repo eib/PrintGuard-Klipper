@@ -1,71 +1,72 @@
+# =============================================================================
 # Stage 1: Build WebUI
+# =============================================================================
 FROM node:20-slim AS webui-builder
+
 WORKDIR /app/webui
 COPY webui/package*.json ./
-RUN npm install
+RUN npm ci
 COPY webui/ ./
 RUN npm run build
 
-# Stage 2: Runtime
-FROM python:3.13-slim
+# =============================================================================
+# Stage 2: Python Builder
+# =============================================================================
+FROM python:3.13-slim-bookworm AS python-builder
 
-# Set environment variables
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    DEBIAN_FRONTEND=noninteractive \
-    PORT=8000 \
-    WEBUI_PORT=8000
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
-# Install system dependencies
+# Install build dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
-    ca-certificates \
-    gnupg \
-    build-essential \
-    libavdevice-dev \
-    libavfilter-dev \
-    libopus-dev \
-    libvpx-dev \
-    pkg-config \
-    libsrtp2-dev \
-    && ARCH=$(dpkg --print-architecture) \
-    && curl -L -o /tmp/cloudflared.deb "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${ARCH}.deb" \
-    && dpkg -i /tmp/cloudflared.deb \
-    && rm /tmp/cloudflared.deb \
+    curl build-essential pkg-config \
+    libavdevice-dev libavfilter-dev libopus-dev libvpx-dev libsrtp2-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Set work directory
+WORKDIR /app
+ENV UV_COMPILE_BYTECODE=1
+
+# Download cloudflared binary
+RUN ARCH=$(dpkg --print-architecture) && \
+    curl -L -o /tmp/cloudflared \
+    "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${ARCH}" && \
+    chmod +x /tmp/cloudflared
+
+# Create venv and install dependencies (cached layer)
+COPY printguard-shared/ ./printguard-shared/
+COPY src/printguard/requirements.txt ./requirements.txt
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv venv /app/.venv && \
+    . /app/.venv/bin/activate && \
+    uv pip install --no-cache ./printguard-shared/ && \
+    uv pip install --no-cache -r requirements.txt
+
+# Install main package
+COPY pyproject.toml README.md LICENSE.md ./
+COPY src/ ./src/
+RUN --mount=type=cache,target=/root/.cache/uv \
+    . /app/.venv/bin/activate && \
+    uv pip install --no-cache --no-deps .
+
+# =============================================================================
+# Stage 3: Runtime
+# =============================================================================
+FROM python:3.13-slim-bookworm
+
 WORKDIR /app
 
-# Copy project configuration files
-COPY pyproject.toml .
-COPY src/printguard/requirements.txt src/printguard/requirements.txt
+ENV PATH="/app/.venv/bin:$PATH" \
+    PYTHONUNBUFFERED=1 \
+    PORT=8000
 
-# Copy printguard-shared (required for local dependency)
-COPY printguard-shared/ ./printguard-shared/
+# Install runtime libraries only
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates libavdevice59 libavfilter8 libopus0 libvpx7 libsrtp2-1 \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install printguard-shared first
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir ./printguard-shared/
-
-# Copy source code (needed to build the main package)
-COPY src/ ./src/
-
-# Install Python dependencies and main package
-RUN pip install --no-cache-dir .
-
-# Copy built WebUI from Stage 1
+# Copy build artifacts
+COPY --from=python-builder /tmp/cloudflared /usr/local/bin/cloudflared
+COPY --from=python-builder /app/.venv /app/.venv
 COPY --from=webui-builder /app/webui/dist ./webui/dist
 
-# Copy any remaining files (excluding what's in .dockerignore)
-COPY . .
-
-# Final installation to ensure all entry points are set up
-RUN pip install --no-cache-dir .
-
-# Expose the port the app runs on
-EXPOSE $PORT
-
-# Command to run the application
 ENTRYPOINT ["printguard"]
 CMD ["serve"]
