@@ -106,7 +106,8 @@ async def register_printer(
         inference_sensitivity=config.inference_sensitivity,
         inference_majority_voting=config.inference_majority_voting,
         inference_target_fps=config.inference_target_fps,
-        detection_action=config.detection_action
+        detection_action=config.detection_action,
+        inference_paused=config.inference_paused
     )
     if config.id:
         db_printer.id = config.id
