@@ -12,7 +12,7 @@ const typeFilter = ref('All')
 const providerFilter = ref('All')
 const connectionFilter = ref('All')
 
-const providers = ['All', 'homeassistant', 'octoprint', 'bambulabs', 'webrtc', 'webcam']
+const providers = ['All', 'homeassistant', 'octoprint', 'bambulabs', 'webcam']
 const providerOptions = providers.map(p => ({ value: p, label: p }))
 
 const connectionOptions = computed(() => [

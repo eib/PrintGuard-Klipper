@@ -14,6 +14,7 @@ from ...providers import get_provider
 from ...services.webrtc import start_track_processing
 from ...services.streams import stream_manager
 from ...services.component_resolver import build_component_config
+from ...services.component_validator import is_valid_entity
 from ..auth_utils import get_current_identity
 from ..crypto_utils import EncryptedRoute
 
@@ -76,6 +77,17 @@ async def create_component(
 ):
     """Create a new component."""
     entity_config = request.entity_config or {}
+    
+    # 1. Domain Validation (mostly for Home Assistant)
+    entity_id = entity_config.get("entity_id")
+    if entity_id and "." in entity_id:
+        if not is_valid_entity(request.type, entity_id):
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Entity {entity_id} is not valid for component type {request.type}"
+            )
+
+    # 2. Cleanup: Handle provider-specific config initialization
     if request.provider == "webcam" and entity_config.get("type") == "browser":
         entity_config["owner_id"] = user.id
 
@@ -113,6 +125,14 @@ async def update_component(
     if request.name is not None:
         component.name = request.name
     if request.entity_config is not None:
+        # Validation for entity type match
+        entity_id = request.entity_config.get("entity_id")
+        if entity_id and "." in entity_id:
+            if not is_valid_entity(component.type, entity_id):
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"Entity {entity_id} is not valid for component type {component.type}"
+                )
         component.entity_config.update(request.entity_config)
         
     await db.commit()

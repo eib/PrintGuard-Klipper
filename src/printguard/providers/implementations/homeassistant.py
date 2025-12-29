@@ -10,6 +10,7 @@ from aiortc.contrib.media import MediaPlayer
 
 from ..base import PrinterProvider
 from ..registry import register
+from ...services.component_validator import get_component_type_from_entity
 
 logger = logging.getLogger(__name__)
 
@@ -116,16 +117,11 @@ class HomeAssistantProvider(PrinterProvider):
                 entities = []
                 for state in states:
                     entity_id = state["entity_id"]
-                    domain = entity_id.split(".")[0]
                     name = state.get("attributes", {}).get("friendly_name", entity_id)
+                    comp_type = get_component_type_from_entity(entity_id)
                     
-                    if domain == "camera":
-                        entities.append({"id": entity_id, "name": name, "type": "camera"})
-                    elif domain in ["sensor", "binary_sensor", "switch", "button"]:
-                        if any(x in entity_id.lower() for x in ["status", "state", "print"]):
-                            entities.append({"id": entity_id, "name": name, "type": "status"})
-                        elif domain in ["button", "switch"]:
-                            entities.append({"id": entity_id, "name": name, "type": "control"})
+                    if comp_type:
+                        entities.append({"id": entity_id, "name": name, "type": comp_type})
                 return entities
         except Exception as e:
             logger.error(f"HA entity listing failed: {e}")
@@ -208,8 +204,6 @@ class HomeAssistantProvider(PrinterProvider):
                 return "printing"
             if state in self.paused_states:
                 return "paused"
-            if self.entity_id.startswith("camera."):
-                return "printing"
             return "idle"
         except Exception as e:
             logger.error(f"Failed to get status for {self.entity_id}: {e}")

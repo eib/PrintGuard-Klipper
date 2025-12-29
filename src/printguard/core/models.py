@@ -234,6 +234,7 @@ class PrinterConfig(BaseModel):
     inference_target_fps: float = 1000.0
     detection_action: str = "none"
     inference_paused: bool = True
+    auto_detection: bool = False
 
 
 class PrinterInfo(BaseModel):
@@ -251,6 +252,7 @@ class PrinterInfo(BaseModel):
     detection_action: str = "none"
     notifications_enabled: bool = False
     inference_paused: bool = True
+    auto_detection: bool = False
 
 
 class ConnectionInfo(BaseModel):
@@ -297,3 +299,4 @@ class PrinterUpdate(BaseModel):
     inference_majority_voting: Optional[int] = None
     inference_target_fps: Optional[float] = None
     detection_action: Optional[str] = None
+    auto_detection: Optional[bool] = None

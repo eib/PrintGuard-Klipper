@@ -38,7 +38,8 @@ const formData = ref<PrinterCreate>({
   inference_sensitivity: 1.0,
   inference_majority_voting: 1,
   inference_target_fps: 2.0,
-  detection_action: 'none'
+  detection_action: 'none',
+  auto_detection: false
 })
 
 watch([() => props.show, () => props.printer], ([show, printer]) => {
@@ -57,7 +58,8 @@ watch([() => props.show, () => props.printer], ([show, printer]) => {
         inference_sensitivity: printer.inference_sensitivity ?? 1.0,
         inference_majority_voting: printer.inference_majority_voting ?? 1,
         inference_target_fps: printer.inference_target_fps ?? 2.0,
-        detection_action: printer.detection_action ?? 'none'
+        detection_action: printer.detection_action ?? 'none',
+        auto_detection: printer.auto_detection ?? false
       }
       notificationsEnabled.value = printer.notifications_enabled || false
     } else {
@@ -71,7 +73,8 @@ watch([() => props.show, () => props.printer], ([show, printer]) => {
         inference_sensitivity: 1.0,
         inference_majority_voting: 1,
         inference_target_fps: 2.0,
-        detection_action: 'none'
+        detection_action: 'none',
+        auto_detection: false
       }
       notificationsEnabled.value = false
     }
@@ -120,6 +123,12 @@ async function handleSave() {
 watch(() => formData.value.components.control, (newControl) => {
   if (!newControl) {
     formData.value.detection_action = 'none'
+  }
+})
+
+watch(() => formData.value.components.status, (newStatus) => {
+  if (!newStatus) {
+    formData.value.auto_detection = false
   }
 })
 </script>
@@ -230,6 +239,16 @@ watch(() => formData.value.components.control, (newControl) => {
         </small>
         <small class="field-help" v-else>
           Choose what happens automatically when a defect is detected.
+        </small>
+      </div>
+
+      <div class="form-field" v-if="formData.components.status">
+        <label :class="$style.checkboxLabel">
+          <input type="checkbox" v-model="formData.auto_detection" />
+          Auto start/stop detection based on printing status
+        </label>
+        <small class="field-help">
+          Requires a Status Source. Detection will start when printing and stop when not printing.
         </small>
       </div>
 

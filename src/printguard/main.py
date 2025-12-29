@@ -17,6 +17,7 @@ from .api.routes import router
 from .services.webrtc import cleanup
 from .services.tunnel_manager import setup_active_tunnel
 from .services.storage import screenshot_manager
+from .services.auto_detection import auto_detection_monitor
 
 # Configure logging
 logging.basicConfig(
@@ -53,6 +54,7 @@ async def lifespan(app: FastAPI):
             screenshot_manager.cleanup()
 
     cleanup_task = asyncio.create_task(periodic_cleanup())
+    auto_detection_task = asyncio.create_task(auto_detection_monitor())
 
     yield
     
@@ -60,6 +62,11 @@ async def lifespan(app: FastAPI):
     cleanup_task.cancel()
     try:
         await cleanup_task
+    except asyncio.CancelledError:
+        pass
+    auto_detection_task.cancel()
+    try:
+        await auto_detection_task
     except asyncio.CancelledError:
         pass
 

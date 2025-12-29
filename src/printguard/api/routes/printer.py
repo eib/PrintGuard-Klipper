@@ -66,7 +66,8 @@ async def _get_or_create_printer_instance(printer_id: str, db: AsyncSession) -> 
         inference_majority_voting=db_printer.inference_majority_voting,
         inference_target_fps=db_printer.inference_target_fps,
         detection_action=db_printer.detection_action,
-        inference_paused=db_printer.inference_paused
+        inference_paused=db_printer.inference_paused,
+        auto_detection=getattr(db_printer, "auto_detection", False)
     )
     instance = PrinterInstance(config=config)
     for role, db_comp in comp_map.items():
@@ -107,7 +108,8 @@ async def register_printer(
         inference_majority_voting=config.inference_majority_voting,
         inference_target_fps=config.inference_target_fps,
         detection_action=config.detection_action,
-        inference_paused=config.inference_paused
+        inference_paused=config.inference_paused,
+        auto_detection=config.auto_detection
     )
     if config.id:
         db_printer.id = config.id
@@ -177,6 +179,8 @@ async def update_printer(
         db_printer.inference_target_fps = config.inference_target_fps
     if config.detection_action is not None:
         db_printer.detection_action = config.detection_action
+    if getattr(config, "auto_detection", None) is not None:
+        db_printer.auto_detection = config.auto_detection
         
     if config.components is not None:
         for link in db_printer.component_links:
@@ -292,7 +296,8 @@ async def get_printer(
         inference_target_fps=instance.config.inference_target_fps,
         detection_action=instance.config.detection_action,
         notifications_enabled=notifications_enabled,
-        inference_paused=inference_paused
+        inference_paused=inference_paused,
+        auto_detection=getattr(instance.config, "auto_detection", False)
     )
 
 

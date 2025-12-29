@@ -33,6 +33,7 @@ class Printer(Base):
     inference_target_fps: Mapped[float] = mapped_column(default=1000.0)
     detection_action: Mapped[str] = mapped_column(String(20), default="none")
     inference_paused: Mapped[bool] = mapped_column(default=True)
+    auto_detection: Mapped[bool] = mapped_column(default=False)
     
     component_links: Mapped[list["PrinterComponentLink"]] = relationship(back_populates="printer", cascade="all, delete-orphan")
 

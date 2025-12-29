@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { connectionsApi } from '../../services/api'
 import Badge from '../ui/Badge.vue'
 import type { Entity } from '../../types'
@@ -16,6 +16,20 @@ const emit = defineEmits<{
 const entities = ref<Entity[]>([])
 const loading = ref(false)
 const error = ref<string | null>(null)
+
+const filteredEntities = computed(() => {
+  if (!props.type) return entities.value
+  return entities.value.filter(e => e.type === props.type)
+})
+
+const entityTypeLabel = computed(() => {
+  switch (props.type) {
+    case 'camera': return 'cameras'
+    case 'status': return 'status sensors'
+    case 'control': return 'controls'
+    default: return 'entities'
+  }
+})
 
 async function fetchEntities() {
   loading.value = true
@@ -35,11 +49,11 @@ onMounted(fetchEntities)
 
 <template>
   <div :class="$style.browser">
-    <div v-if="loading" :class="$style.loading">Scanning for entities...</div>
+    <div v-if="loading" :class="$style.loading">Scanning for {{ entityTypeLabel }}...</div>
     <div v-else-if="error" :class="$style.error">{{ error }}</div>
     <div v-else :class="$style.list">
       <div 
-        v-for="entity in entities" 
+        v-for="entity in filteredEntities" 
         :key="entity.id" 
         :class="$style.item"
         @click="emit('select', entity)"
@@ -50,8 +64,8 @@ onMounted(fetchEntities)
         </div>
         <Badge variant="neutral" size="sm">{{ entity.type }}</Badge>
       </div>
-      <div v-if="entities.length === 0" :class="$style.empty">
-        No entities found for this connection.
+      <div v-if="filteredEntities.length === 0" :class="$style.empty">
+        No {{ entityTypeLabel }} found for this connection.
       </div>
     </div>
   </div>

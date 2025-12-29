@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import BaseModal from '../shared/BaseModal.vue'
 import ProviderForm from '../shared/ProviderForm.vue'
 import EntityBrowser from '../connections/EntityBrowser.vue'
@@ -21,6 +22,7 @@ const emit = defineEmits<{
   (e: 'created', component: Component): void
 }>()
 
+const router = useRouter()
 const store = useComponentsStore()
 const connStore = useConnectionsStore()
 const loading = ref(false)
@@ -39,34 +41,41 @@ const selectedConnection = computed(() =>
   connStore.connections.find(c => c.id === formData.value.connection_id)
 )
 
+const showStandaloneOptions = computed(() => formData.value.type === 'camera')
+
+const connectionLabel = computed(() => 
+  showStandaloneOptions.value 
+    ? 'Select a connection or choose standalone' 
+    : 'Select a connection'
+)
+
+const hasConnections = computed(() => connStore.connections.length > 0)
+
+function goToConnections() {
+  emit('close')
+  router.push('/connections')
+}
+
 watch(() => props.show, (show) => {
-  if (show) {
-    if (props.component) {
-      formData.value = {
-        name: props.component.name,
-        type: props.component.type,
-        provider: props.component.provider,
-        connection_id: props.component.connection_id,
-        entity_config: { ...props.component.entity_config }
-      }
-      step.value = 3
-    } else {
-      formData.value = {
-        name: '',
-        type: props.initialType || 'camera',
-        provider: 'homeassistant',
-        connection_id: undefined,
-        entity_config: {}
-      }
-      step.value = 1
+  if (!show) return
+  
+  if (props.component) {
+    formData.value = { ...props.component, entity_config: { ...props.component.entity_config } }
+    step.value = 3
+  } else {
+    formData.value = {
+      name: '',
+      type: props.initialType || 'camera',
+      provider: 'homeassistant',
+      connection_id: undefined,
+      entity_config: {}
     }
+    step.value = 1
   }
 })
 
 function nextStep() {
   if (step.value === 1) {
-    if (formData.value.type === 'camera' && !formData.value.connection_id) {
-    }
     step.value = 2
   } else if (step.value === 2) {
     step.value = 3
@@ -131,8 +140,14 @@ function onEntitySelect(entity: any) {
     </div>
 
     <div v-else-if="step === 2" :class="$style.form">
-      <label>Select a connection or choose standalone</label>
-      <div :class="$style.connList">
+      <label>{{ connectionLabel }}</label>
+      
+      <div v-if="!hasConnections && !showStandaloneOptions" :class="$style.emptyState">
+        <p>No connections found. You need to add a connection (like Home Assistant) before you can add this component.</p>
+        <Button variant="secondary" @click="goToConnections">Go to Connections</Button>
+      </div>
+
+      <div v-else :class="$style.connList">
         <button
           v-for="c in connStore.connections"
           :key="c.id"
@@ -143,22 +158,17 @@ function onEntitySelect(entity: any) {
           <Badge variant="neutral" size="sm">{{ c.provider }}</Badge>
         </button>
 
-        <div :class="$style.divider">OR</div>
+        <template v-if="showStandaloneOptions">
+          <div v-if="hasConnections" :class="$style.divider">OR</div>
 
-        <button
-          :class="[$style.connItem, { [$style.connActive]: !formData.connection_id && formData.provider === 'webrtc' }]"
-          @click="formData.connection_id = undefined; formData.provider = 'webrtc'; nextStep()"
-        >
-          <strong>Standalone WebRTC</strong>
-          <span>Direct stream link</span>
-        </button>
-        <button
-          :class="[$style.connItem, { [$style.connActive]: !formData.connection_id && formData.provider === 'webcam' }]"
-          @click="formData.connection_id = undefined; formData.provider = 'webcam'; nextStep()"
-        >
-          <strong>Standalone Webcam</strong>
-          <span>Browser or RTSP</span>
-        </button>
+          <button
+            :class="[$style.connItem, { [$style.connActive]: !formData.connection_id && formData.provider === 'webcam' }]"
+            @click="formData.connection_id = undefined; formData.provider = 'webcam'; nextStep()"
+          >
+            <strong>Standalone Webcam</strong>
+            <span>Browser or RTSP</span>
+          </button>
+        </template>
       </div>
     </div>
 
@@ -237,6 +247,25 @@ function onEntitySelect(entity: any) {
   font-size: var(--font-size-base);
   font-weight: var(--font-weight-medium);
   color: var(--text-primary);
+}
+
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-6);
+  padding: var(--space-8);
+  text-align: center;
+  background-color: var(--bg-secondary);
+  border-radius: var(--radius-xl);
+  border: 1px dashed var(--border-default);
+}
+
+.emptyState p {
+  color: var(--text-tertiary);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-relaxed);
+  max-width: 300px;
 }
 
 .typeGrid {
