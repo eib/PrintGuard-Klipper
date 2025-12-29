@@ -124,7 +124,7 @@ class HomeAssistantProvider(PrinterProvider):
                         entities.append({"id": entity_id, "name": name, "type": comp_type})
                 return entities
         except Exception as e:
-            logger.error(f"HA entity listing failed: {e}")
+            logger.error(f"HA entity listing failed for {hass_url}: {e}")
             return []
 
     async def _call_service(self, domain: str, service: str, service_data: dict) -> None:

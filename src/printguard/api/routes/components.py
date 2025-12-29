@@ -248,7 +248,7 @@ async def link_component_stream(
     processor = await start_track_processing(track, predict, model_info, settings, session_id)
     
     if processor.relayed_track:
-        stream_manager.register_source(
+        await stream_manager.register_source(
             id, 
             processor.relayed_track, 
             processor,

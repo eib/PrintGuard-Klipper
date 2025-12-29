@@ -120,3 +120,10 @@ This setup allows you to:
 2. Restart Home Assistant to apply those changes.
 3. Test the integration directly within a real Home Assistant environment.
 
+### Important: Docker Networking
+
+If you are running PrintGuard in Docker, `http://localhost:8123` will **not** work to reach Home Assistant because `localhost` refers to the PrintGuard container itself.
+
+- **On macOS/Windows**: Use `http://host.docker.internal:8123` as the HA URL when configuring the connection in PrintGuard.
+- **On Linux**: Use the host's actual LAN IP (e.g., `http://192.168.1.10:8123`) or the container IP if using a custom network.
+
