@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import HealthBadge from '../shared/HealthBadge.vue'
 import IconButton from '../ui/IconButton.vue'
-import { Search, Edit, Trash2 } from 'lucide-vue-next'
+import { Edit, Trash2 } from 'lucide-vue-next'
 import type { Connection } from '../../types'
 
 defineProps<{
@@ -11,7 +11,6 @@ defineProps<{
 const emit = defineEmits<{
   (e: 'edit', connection: Connection): void
   (e: 'delete', connection: Connection): void
-  (e: 'browse', connection: Connection): void
 }>()
 </script>
 
@@ -40,14 +39,6 @@ const emit = defineEmits<{
             </td>
             <td data-label="Actions">
               <div class="table-actions">
-                <IconButton
-                  variant="ghost"
-                  size="sm"
-                  title="Browse Entities"
-                  @click="emit('browse', conn)"
-                >
-                  <Search />
-                </IconButton>
                 <IconButton
                   variant="ghost"
                   size="sm"

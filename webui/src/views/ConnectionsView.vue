@@ -58,10 +58,6 @@ async function confirmDelete(cascade: boolean) {
     console.error(e)
   }
 }
-
-function openBrowse(conn: Connection) {
-  console.log('Browse entities for:', conn.name)
-}
 </script>
 
 <template>
@@ -88,7 +84,6 @@ function openBrowse(conn: Connection) {
       :connections="store.connections"
       @edit="openEdit"
       @delete="openDelete"
-      @browse="openBrowse"
     />
 
     <ConnectionModal
