@@ -29,6 +29,11 @@ class BaseProvider(ABC):
         """Fetch available entities from the provider."""
         return []
 
+    @classmethod
+    async def get_entity_details(cls, config: dict, entity_id: str) -> dict:
+        """Fetch full details for a specific entity."""
+        return {}
+
 
 class StatusSource(BaseProvider, ABC):
     """Interface for providing printer status."""

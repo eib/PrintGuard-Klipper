@@ -10,6 +10,9 @@ const props = defineProps<{
   provider: string
   modelValue: Record<string, any>
   mode: 'connection' | 'entity'
+  entityDetails?: any
+  type?: string
+  hiddenFields?: string[]
 }>()
 
 const emit = defineEmits<{
@@ -30,6 +33,47 @@ const deviceOptions = computed(() => [
     label: d.label || `Camera ${d.deviceId.slice(0, 5)}`
   }))
 ])
+
+const attributeOptions = computed(() => {
+  if (!props.entityDetails?.attributes) return []
+  return Object.keys(props.entityDetails.attributes).map(attr => ({
+    value: attr,
+    label: attr
+  }))
+})
+
+const enumOptions = computed(() => {
+  const opts = props.entityDetails?.attributes?.options
+  if (!Array.isArray(opts)) return null
+  const values = opts
+    .map(o => String(o))
+    .filter(o => o.length > 0)
+  return values.length ? values : null
+})
+
+const stateSuggestions = computed(() => {
+  const suggestions = new Set<string>()
+  if (props.entityDetails) {
+    const currentVal = props.modelValue.state_attribute 
+      ? props.entityDetails.attributes?.[props.modelValue.state_attribute] 
+      : props.entityDetails.state
+    if (currentVal !== undefined && currentVal !== null) {
+      suggestions.add(String(currentVal).toLowerCase())
+    }
+  }
+  
+  return Array.from(suggestions).sort()
+})
+
+const currentEntityValue = computed(() => {
+  if (!props.entityDetails) return null
+  const attr = props.modelValue.state_attribute
+  let val = attr ? props.entityDetails.attributes?.[attr] : props.entityDetails.state
+  
+  if (val === undefined || val === null) return null
+  
+  return val
+})
 
 async function fetchSchema() {
   if (!props.provider) return
@@ -73,7 +117,7 @@ function checkCondition(condition?: string): boolean {
   if (!match) return true
   
   const [_, key, op, val] = match
-  const currentVal = props.modelValue[key]
+  const currentVal = key === 'type' && props.type ? props.type : props.modelValue[key]
   
   if (op === '==') return currentVal === val
   if (op === '!=') return currentVal !== val
@@ -84,7 +128,12 @@ function checkCondition(condition?: string): boolean {
 const visibleFields = computed(() => {
   if (!schema.value) return []
   const fields = props.mode === 'connection' ? schema.value.connection_fields : schema.value.entity_fields
-  return fields.filter(f => checkCondition(f.condition))
+  return fields.filter(f => {
+    const isHidden = props.hiddenFields?.includes(f.name)
+    const isHAStatusAttribute =
+      props.provider === 'homeassistant' && props.type === 'status' && f.name === 'state_attribute'
+    return !isHidden && !isHAStatusAttribute && checkCondition(f.condition)
+  })
 })
 
 watch(() => props.modelValue.device_id, (newId) => {
@@ -125,15 +174,49 @@ watch(currentStream, async (stream) => {
            class="form-field">
         <label :for="field.name">{{ field.label }}<span v-if="field.required" :class="$style.required">*</span></label>
         
+        <!-- Enum Select for HA status mapping -->
+        <Select
+          v-if="field.name.endsWith('_state') && enumOptions"
+          :id="field.name"
+          :modelValue="modelValue[field.name] || ''"
+          :options="enumOptions.map(v => ({ value: v, label: v }))"
+          @update:modelValue="updateField(field.name, $event)"
+          fullWidth
+        />
+
         <!-- Standard Select -->
         <Select 
-          v-if="field.type === 'select'"
+          v-else-if="field.type === 'select'"
           :id="field.name"
           :modelValue="modelValue[field.name]"
           :options="field.options || []"
           @update:modelValue="updateField(field.name, $event)"
           fullWidth
         />
+
+        <!-- Combobox (Select + Text) -->
+        <div v-else-if="field.type === 'combobox'" :class="$style.combobox">
+          <Input 
+            :id="field.name"
+            :list="`${field.name}-list`"
+            :modelValue="modelValue[field.name]"
+            @update:modelValue="updateField(field.name, $event)"
+            :placeholder="field.placeholder || `Enter or select ${field.label.toLowerCase()}...`"
+            fullWidth
+          />
+          <datalist :id="`${field.name}-list`">
+            <option 
+              v-for="opt in (field.name.endsWith('_state') ? stateSuggestions : attributeOptions.map(o => o.value))" 
+              :key="opt" 
+              :value="opt"
+            >
+              {{ opt }}
+            </option>
+          </datalist>
+          <p v-if="entityDetails" :class="$style.hint">
+            Current value: <strong>{{ currentEntityValue }}</strong>
+          </p>
+        </div>
 
         <!-- Device Select for Webcams -->
         <div v-else-if="field.type === 'device_select'" :class="$style.devicePicker">
@@ -152,15 +235,19 @@ watch(currentStream, async (stream) => {
         </div>
 
         <!-- Text/Password Inputs -->
-        <Input 
-          v-else
-          :id="field.name"
-          :type="field.type === 'password' ? 'password' : 'text'"
-          :modelValue="modelValue[field.name]"
-          @update:modelValue="updateField(field.name, $event)"
-          :placeholder="field.placeholder || `Enter ${field.label.toLowerCase()}...`"
-          fullWidth
-        />
+        <div v-else :class="$style.inputWrapper">
+          <Input 
+            :id="field.name"
+            :type="field.type === 'password' ? 'password' : 'text'"
+            :modelValue="modelValue[field.name]"
+            @update:modelValue="updateField(field.name, $event)"
+            :placeholder="field.placeholder || `Enter ${field.label.toLowerCase()}...`"
+            fullWidth
+          />
+          <p v-if="entityDetails && field.name.endsWith('_states')" :class="$style.hint">
+            Tip: Current entity value is <strong>{{ currentEntityValue }}</strong>
+          </p>
+        </div>
       </div>
     </div>
   </div>
@@ -176,6 +263,16 @@ watch(currentStream, async (stream) => {
 .required {
   color: var(--danger);
   margin-left: var(--space-1);
+}
+
+.hint {
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
+  margin-top: var(--space-1);
+}
+
+.hint strong {
+  color: var(--text-primary);
 }
 
 .loading, .error {

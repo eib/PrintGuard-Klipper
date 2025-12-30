@@ -50,7 +50,8 @@ export const connectionsApi = {
   delete: (id: string, cascade = false) => api.delete(`/connections/${id}`, { params: { cascade } }),
   health: (id: string) => api.get<HealthStatus>(`/connections/${id}/health`),
   components: (id: string) => api.get<Component[]>(`/connections/${id}/components`),
-  entities: (id: string, type?: string) => api.get<Entity[]>(`/connections/${id}/entities`, { params: { type } })
+  entities: (id: string, type?: string) => api.get<Entity[]>(`/connections/${id}/entities`, { params: { type } }),
+  entityDetails: (id: string, entityId: string) => api.get<any>(`/connections/${id}/entities/${entityId}`)
 }
 
 export const componentsApi = {

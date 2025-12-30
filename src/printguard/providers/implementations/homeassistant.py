@@ -23,9 +23,10 @@ class HomeAssistantProvider(PrinterProvider):
                  pause_entity_id: Optional[str] = None,
                  resume_entity_id: Optional[str] = None,
                  stop_entity_id: Optional[str] = None,
-                 printing_states: Optional[str] = None,
-                 paused_states: Optional[str] = None,
-                 error_states: Optional[str] = None):
+                 printing_state: Optional[str] = None,
+                 paused_state: Optional[str] = None,
+                 error_state: Optional[str] = None,
+                 state_attribute: Optional[str] = None):
         self.hass_url = hass_url.rstrip("/")
         self.token = token
         self.entity_id = entity_id
@@ -33,9 +34,10 @@ class HomeAssistantProvider(PrinterProvider):
         self.pause_entity_id = pause_entity_id
         self.resume_entity_id = resume_entity_id
         self.stop_entity_id = stop_entity_id
-        self.printing_states = [s.strip().lower() for s in (printing_states or "printing,on,active").split(",")]
-        self.paused_states = [s.strip().lower() for s in (paused_states or "paused").split(",")]
-        self.error_states = [s.strip().lower() for s in (error_states or "error,unavailable,unknown").split(",")]
+        self.printing_state = (printing_state or "printing").strip().lower()
+        self.paused_state = (paused_state or "paused").strip().lower()
+        self.error_state = (error_state or "error").strip().lower()
+        self.state_attribute = state_attribute
         self.headers = {
             "Authorization": f"Bearer {self.token}",
             "Content-Type": "application/json"
@@ -56,9 +58,9 @@ class HomeAssistantProvider(PrinterProvider):
             ],
             "entity_fields": [
                 {"name": "entity_id", "type": "string", "required": True, "label": "Entity ID"},
-                {"name": "printing_states", "type": "string", "required": False, "label": "Printing States (comma separated)", "default": "printing,on,active"},
-                {"name": "paused_states", "type": "string", "required": False, "label": "Paused States (comma separated)", "default": "paused"},
-                {"name": "error_states", "type": "string", "required": False, "label": "Error States (comma separated)", "default": "error,unavailable,unknown"}
+                {"name": "printing_state", "type": "combobox", "required": True, "label": "Printing State", "default": "printing", "condition": "type == 'status'"},
+                {"name": "paused_state", "type": "combobox", "required": True, "label": "Paused State", "default": "paused", "condition": "type == 'status'"},
+                {"name": "error_state", "type": "combobox", "required": True, "label": "Error State", "default": "error", "condition": "type == 'status'"}
             ]
         }
 
@@ -82,12 +84,18 @@ class HomeAssistantProvider(PrinterProvider):
 
     @classmethod
     async def validate_component(cls, config: dict) -> bool:
-        """Test if HA entity exists."""
+        """Test if HA entity exists and required fields are present."""
         hass_url = config.get("hass_url", "").rstrip("/")
         token = config.get("token", "")
         entity_id = config.get("entity_id", "")
+        
         if not all([hass_url, token, entity_id]):
             return False
+
+        if entity_id.startswith(("sensor.", "binary_sensor.")):
+            if not all([config.get("printing_state"), config.get("paused_state"), config.get("error_state")]):
+                return False
+
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 resp = await client.get(
@@ -117,15 +125,40 @@ class HomeAssistantProvider(PrinterProvider):
                 entities = []
                 for state in states:
                     entity_id = state["entity_id"]
-                    name = state.get("attributes", {}).get("friendly_name", entity_id)
+                    attributes = state.get("attributes", {})
+                    name = attributes.get("friendly_name", entity_id)
                     comp_type = get_component_type_from_entity(entity_id)
-                    
+
                     if comp_type:
+                        if comp_type == "status":
+                            options = attributes.get("options")
+                            if not isinstance(options, list) or not options:
+                                continue
+
                         entities.append({"id": entity_id, "name": name, "type": comp_type})
                 return entities
         except Exception as e:
             logger.error(f"HA entity listing failed for {hass_url}: {e}")
             return []
+
+    @classmethod
+    async def get_entity_details(cls, config: dict, entity_id: str) -> dict:
+        """Fetch full state and attributes for a specific entity from HA."""
+        hass_url = config.get("hass_url", "").rstrip("/")
+        token = config.get("token", "")
+        if not all([hass_url, token, entity_id]):
+            return {}
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.get(
+                    f"{hass_url}/api/states/{entity_id}",
+                    headers={"Authorization": f"Bearer {token}"}
+                )
+                resp.raise_for_status()
+                return resp.json()
+        except Exception as e:
+            logger.error(f"HA entity detail fetch failed for {entity_id} at {hass_url}: {e}")
+            return {}
 
     async def _call_service(self, domain: str, service: str, service_data: dict) -> None:
         """Call a Home Assistant service."""
@@ -196,13 +229,19 @@ class HomeAssistantProvider(PrinterProvider):
             response = await self.client.get(f"/api/states/{self.entity_id}")
             response.raise_for_status()
             data = response.json()
-            state = data.get("state", "").lower()
+
+            if self.entity_id.startswith(("sensor.", "binary_sensor.")):
+                state = str(data.get("state", "")).lower()
+            elif self.state_attribute:
+                state = str(data.get("attributes", {}).get(self.state_attribute, "")).lower()
+            else:
+                state = str(data.get("state", "")).lower()
             
-            if state in self.error_states:
+            if state == self.error_state:
                 return "error"
-            if state in self.printing_states:
+            if state == self.printing_state:
                 return "printing"
-            if state in self.paused_states:
+            if state == self.paused_state:
                 return "paused"
             return "idle"
         except Exception as e:

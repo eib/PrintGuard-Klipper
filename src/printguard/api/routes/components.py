@@ -91,6 +91,23 @@ async def create_component(
     if request.provider == "webcam" and entity_config.get("type") == "browser":
         entity_config["owner_id"] = user.id
 
+    # 3. Provider-specific validation
+    prov_cls = get_provider(request.provider)
+    if prov_cls:
+        full_config = {**entity_config}
+        if request.connection_id:
+            from ...core.db_models import Connection
+            res = await db.execute(select(Connection).where(Connection.id == request.connection_id))
+            conn = res.scalar_one_or_none()
+            if conn:
+                full_config.update(conn.config)
+        
+        if not await prov_cls.validate_component(full_config):
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Configuration validation failed for provider {request.provider}. Ensure all required fields (like state labels) are provided and the entity exists."
+            )
+
     component = Component(
         name=request.name,
         type=request.type,
@@ -133,6 +150,23 @@ async def update_component(
                     status_code=400, 
                     detail=f"Entity {entity_id} is not valid for component type {component.type}"
                 )
+
+        prov_cls = get_provider(component.provider)
+        if prov_cls:
+            full_config = {**(component.entity_config or {}), **request.entity_config}
+            if component.connection_id:
+                from ...core.db_models import Connection
+                res = await db.execute(select(Connection).where(Connection.id == component.connection_id))
+                conn = res.scalar_one_or_none()
+                if conn:
+                    full_config.update(conn.config)
+            
+            if not await prov_cls.validate_component(full_config):
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"Configuration validation failed for provider {component.provider}. Ensure all required fields (like state labels) are provided and the entity exists."
+                )
+
         component.entity_config.update(request.entity_config)
         
     await db.commit()

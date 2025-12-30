@@ -192,3 +192,22 @@ async def list_connection_entities(
         entities = [e for e in entities if e["type"] == type]
     return entities
 
+@router.get("/{id}/entities/{entity_id}")
+async def get_connection_entity_details(
+    id: str,
+    entity_id: str,
+    db: AsyncSession = Depends(get_db),
+    _: any = Security(get_current_identity, scopes=["printer:read"])
+):
+    """Fetch detailed state and attributes for a specific entity."""
+    result = await db.execute(select(Connection).where(Connection.id == id))
+    connection = result.scalar_one_or_none()
+    if not connection:
+        raise HTTPException(status_code=404, detail="Connection not found")
+    
+    prov_cls = get_provider(connection.provider)
+    if not prov_cls:
+        return {}
+    
+    return await prov_cls.get_entity_details(connection.config, entity_id)
+

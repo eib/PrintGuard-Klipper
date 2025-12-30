@@ -3,12 +3,13 @@ import { ref, watch, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import BaseModal from '../shared/BaseModal.vue'
 import ProviderForm from '../shared/ProviderForm.vue'
-import EntityBrowser from '../connections/EntityBrowser.vue'
 import Button from '../ui/Button.vue'
 import Input from '../ui/Input.vue'
+import Select from '../ui/Select.vue'
 import Badge from '../ui/Badge.vue'
 import { useComponentsStore } from '../../store/components'
 import { useConnectionsStore } from '../../store/connections'
+import { connectionsApi } from '../../services/api'
 import type { Component, ComponentCreate } from '../../types'
 
 const props = defineProps<{
@@ -28,6 +29,9 @@ const connStore = useConnectionsStore()
 const loading = ref(false)
 const error = ref<string | null>(null)
 const step = ref(1)
+const entityDetails = ref<any>(null)
+const connectionEntities = ref<any[]>([])
+const loadingEntities = ref(false)
 
 const formData = ref<ComponentCreate>({
   name: '',
@@ -56,11 +60,62 @@ function goToConnections() {
   router.push('/connections')
 }
 
-watch(() => props.show, (show) => {
+async function fetchEntityDetails() {
+  const entityId = formData.value.entity_config?.entity_id
+  const connectionId = formData.value.connection_id
+  if (entityId && connectionId) {
+    try {
+      const response = await connectionsApi.entityDetails(connectionId, entityId)
+      entityDetails.value = response.data
+
+      // Auto-fill common enum mappings for HA status sensors
+      if (formData.value.provider === 'homeassistant' && formData.value.type === 'status') {
+        const opts = entityDetails.value?.attributes?.options
+        if (Array.isArray(opts)) {
+          const lower = opts.map((o: any) => String(o).toLowerCase())
+          const updates = { ...(formData.value.entity_config || {}) }
+          const pick = (key: 'printing_state' | 'paused_state' | 'error_state', val: string) => {
+            if (!updates[key] && lower.includes(val)) updates[key] = val
+          }
+          pick('printing_state', 'printing')
+          pick('paused_state', 'paused')
+          pick('error_state', 'error')
+          formData.value.entity_config = updates
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to fetch entity details:', e)
+      entityDetails.value = null
+    }
+  } else {
+    entityDetails.value = null
+  }
+}
+
+async function fetchConnectionEntities() {
+  if (!formData.value.connection_id) {
+    connectionEntities.value = []
+    return
+  }
+  loadingEntities.value = true
+  try {
+    const response = await connectionsApi.entities(formData.value.connection_id, formData.value.type)
+    connectionEntities.value = response.data
+  } catch (e) {
+    console.error('Failed to fetch connection entities:', e)
+    connectionEntities.value = []
+  } finally {
+    loadingEntities.value = false
+  }
+}
+
+watch(() => props.show, async (show) => {
   if (!show) return
   
   if (props.component) {
     formData.value = { ...props.component, entity_config: { ...props.component.entity_config } }
+    await fetchConnectionEntities()
+    await fetchEntityDetails()
     step.value = 3
   } else {
     formData.value = {
@@ -70,14 +125,19 @@ watch(() => props.show, (show) => {
       connection_id: undefined,
       entity_config: {}
     }
+    entityDetails.value = null
+    connectionEntities.value = []
     step.value = 1
   }
 })
 
-function nextStep() {
+async function nextStep() {
   if (step.value === 1) {
     step.value = 2
   } else if (step.value === 2) {
+    if (formData.value.connection_id) {
+      await fetchConnectionEntities()
+    }
     step.value = 3
   }
 }
@@ -85,6 +145,23 @@ function nextStep() {
 async function handleSave() {
   loading.value = true
   error.value = null
+  
+  // Validation
+  if (formData.value.connection_id && !formData.value.entity_config?.entity_id) {
+    error.value = 'Please select an entity'
+    loading.value = false
+    return
+  }
+
+  if (formData.value.provider === 'homeassistant' && formData.value.type === 'status') {
+    const config = formData.value.entity_config || {}
+    if (!config.printing_state || !config.paused_state || !config.error_state) {
+      error.value = 'Please provide all required state labels (Printing, Paused, Error)'
+      loading.value = false
+      return
+    }
+  }
+
   try {
     const data = {
       ...formData.value,
@@ -105,10 +182,14 @@ async function handleSave() {
   }
 }
 
-function onEntitySelect(entity: any) {
-  formData.value.name = formData.value.name || entity.name
-  formData.value.entity_config.entity_id = entity.id
-  handleSave()
+async function onEntityIdChange(value: string | number) {
+  const entityId = String(value)
+  const entity = connectionEntities.value.find(e => e.id === entityId)
+  if (entity) {
+    formData.value.name = formData.value.name || entity.name
+  }
+  formData.value.entity_config.entity_id = entityId
+  await fetchEntityDetails()
 }
 </script>
 
@@ -186,19 +267,26 @@ function onEntitySelect(entity: any) {
 
       <div v-if="formData.connection_id" class="form-field">
         <label>Select Entity from {{ selectedConnection?.name }}</label>
-        <EntityBrowser
-          :connectionId="formData.connection_id"
-          :type="formData.type"
-          @select="onEntitySelect"
+        <Select 
+          :modelValue="formData.entity_config.entity_id"
+          :options="connectionEntities.map(e => ({ value: e.id, label: e.name }))"
+          @update:modelValue="onEntityIdChange"
+          :disabled="loadingEntities"
+          placeholder="Select an entity..."
+          fullWidth
         />
       </div>
 
-      <ProviderForm
-        v-else
-        :provider="formData.provider"
-        v-model="formData.entity_config"
-        mode="entity"
-      />
+      <div v-if="formData.provider" :class="$style.configForm">
+        <ProviderForm
+          :provider="formData.provider"
+          v-model="formData.entity_config"
+          :entityDetails="entityDetails"
+          :type="formData.type"
+          :hiddenFields="formData.connection_id ? ['entity_id'] : []"
+          mode="entity"
+        />
+      </div>
 
       <div v-if="error" class="form-error">{{ error }}</div>
     </div>
@@ -305,6 +393,12 @@ function onEntitySelect(entity: any) {
   font-weight: var(--font-weight-semibold);
   text-transform: capitalize;
   color: var(--text-primary);
+}
+
+.configForm {
+  margin-top: var(--space-6);
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--border-subtle);
 }
 
 .connList {

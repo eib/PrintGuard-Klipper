@@ -102,7 +102,7 @@ export interface PredictionResult {
 
 export interface ProviderField {
   name: string
-  type: 'string' | 'number' | 'boolean' | 'password' | 'select' | 'device_select'
+  type: 'string' | 'number' | 'boolean' | 'password' | 'select' | 'device_select' | 'combobox'
   required: boolean
   label: string
   placeholder?: string
