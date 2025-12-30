@@ -10,7 +10,7 @@ from aiortc.contrib.media import MediaPlayer
 
 from ..base import PrinterProvider
 from ..registry import register
-from ...services.component_validator import get_component_type_from_entity
+from ...services.component_validator import get_component_type_from_entity, is_camera_entity, is_status_entity
 
 logger = logging.getLogger(__name__)
 
@@ -146,7 +146,7 @@ class HomeAssistantProvider(PrinterProvider):
         if not all([hass_url, token, entity_id]):
             return False
 
-        if entity_id.startswith(("sensor.", "binary_sensor.")):
+        if is_status_entity(entity_id):
             if not all([config.get("printing_state"), config.get("paused_state"), config.get("error_state")]):
                 return False
 
@@ -282,7 +282,7 @@ class HomeAssistantProvider(PrinterProvider):
             response = await _retry_with_backoff(_test_connection)
             logger.info(f"Successfully connected to HA, entity {self.entity_id} state: {response.json().get('state')}")
             # Test camera snapshot proxy access (single JPEG)
-            if self.entity_id.startswith("camera."):
+            if is_camera_entity(self.entity_id):
                 proxy_url = f"/api/camera_proxy/{self.entity_id}"
                 logger.debug(f"Testing camera proxy access: {proxy_url}")
                 
@@ -335,7 +335,7 @@ class HomeAssistantProvider(PrinterProvider):
         try:
             data = await _retry_with_backoff(_fetch_status)
             
-            if self.entity_id.startswith(("sensor.", "binary_sensor.")):
+            if is_status_entity(self.entity_id):
                 state = str(data.get("state", "")).lower()
             elif self.state_attribute:
                 state = str(data.get("attributes", {}).get(self.state_attribute, "")).lower()
@@ -376,7 +376,7 @@ class HomeAssistantProvider(PrinterProvider):
         """Return a video track from Home Assistant's camera proxy."""
         if not self.client:
             await self.connect()
-        if not self.entity_id.startswith("camera."):
+        if not is_camera_entity(self.entity_id):
             logger.warning(f"Entity {self.entity_id} is not a camera")
             return None, None
         stream_url = f"{self.hass_url}/api/camera_proxy_stream/{self.entity_id}"

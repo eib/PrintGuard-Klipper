@@ -3,8 +3,8 @@
 # Mapping of component types to allowed entity domains
 ALLOWED_DOMAINS = {
     "camera": ["camera"],
-    "status": ["sensor", "binary_sensor"],
-    "control": ["button", "switch"]
+    "status": ["sensor", "binary_sensor", "input_select"],
+    "control": ["input_button", "input_boolean"]
 }
 
 def get_allowed_domains(component_type: str) -> list[str]:
@@ -30,4 +30,16 @@ def get_component_type_from_entity(entity_id: str) -> str | None:
         if domain in domains:
             return comp_type
     return None
+
+def is_camera_entity(entity_id: str) -> bool:
+    """Check if an entity ID is a camera component."""
+    return is_valid_entity("camera", entity_id)
+
+def is_status_entity(entity_id: str) -> bool:
+    """Check if an entity ID is a status component."""
+    return is_valid_entity("status", entity_id)
+
+def is_control_entity(entity_id: str) -> bool:
+    """Check if an entity ID is a control component."""
+    return is_valid_entity("control", entity_id)
 
