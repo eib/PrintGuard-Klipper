@@ -26,7 +26,6 @@ export interface Component {
 }
 
 export type ComponentCreate = Omit<Component, 'id' | 'connection'>
-export type ComponentUpdate = Partial<Omit<ComponentCreate, 'type' | 'connection_id'>>
 
 export enum PrinterStatus {
   IDLE = 'idle',

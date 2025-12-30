@@ -2,7 +2,7 @@
 import HealthBadge from '../shared/HealthBadge.vue'
 import IconButton from '../ui/IconButton.vue'
 import Badge from '../ui/Badge.vue'
-import { Eye, Edit, Trash2 } from 'lucide-vue-next'
+import { Eye, Trash2 } from 'lucide-vue-next'
 import type { Component } from '../../types'
 
 defineProps<{
@@ -10,7 +10,6 @@ defineProps<{
 }>()
 
 const emit = defineEmits<{
-  (e: 'edit', component: Component): void
   (e: 'delete', component: Component): void
   (e: 'preview', component: Component): void
 }>()
@@ -58,14 +57,6 @@ const emit = defineEmits<{
                   @click="emit('preview', comp)"
                 >
                   <Eye />
-                </IconButton>
-                <IconButton
-                  variant="ghost"
-                  size="sm"
-                  title="Edit"
-                  @click="emit('edit', comp)"
-                >
-                  <Edit />
                 </IconButton>
                 <IconButton
                   variant="danger"

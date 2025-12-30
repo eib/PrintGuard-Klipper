@@ -49,11 +49,6 @@ function openAdd() {
   showModal.value = true
 }
 
-function openEdit(comp: Component) {
-  selectedComponent.value = comp
-  showModal.value = true
-}
-
 function openDelete(comp: Component) {
   selectedComponent.value = comp
   showDeleteConfirm.value = true
@@ -99,7 +94,6 @@ function openPreview(comp: Component) {
     <ComponentTable
       v-else
       :components="store.components"
-      @edit="openEdit"
       @delete="openDelete"
       @preview="openPreview"
     />

@@ -285,12 +285,6 @@ class ComponentCreate(BaseModel):
     entity_config: dict = {}
 
 
-class ComponentUpdate(BaseModel):
-    """Request to update a component."""
-    name: Optional[str] = None
-    entity_config: Optional[dict] = None
-
-
 class PrinterUpdate(BaseModel):
     """Request to update a printer."""
     name: Optional[str] = None

@@ -2,10 +2,10 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { componentsApi } from '../services/api'
 import { useCrudStore } from '../composables/useCrudStore'
-import type { Component, ComponentCreate, ComponentUpdate } from '../types'
+import type { Component, ComponentCreate } from '../types'
 
 export const useComponentsStore = defineStore('components', () => {
-  const crud = useCrudStore<Component, ComponentCreate, ComponentUpdate>(
+  const crud = useCrudStore<Component, ComponentCreate, any>(
     componentsApi
   )
   const componentRegistry = ref<Record<string, Component>>({})
@@ -31,12 +31,6 @@ export const useComponentsStore = defineStore('components', () => {
     return result
   }
 
-  async function update(id: string, data: ComponentUpdate) {
-    const result = await crud.update(id, data)
-    componentRegistry.value[id] = result
-    return result
-  }
-
   async function remove(id: string, force = false) {
     await componentsApi.delete(id, force)
     crud.items.value = crud.items.value.filter(c => c.id !== id)
@@ -51,7 +45,6 @@ export const useComponentsStore = defineStore('components', () => {
     error: crud.error,
     fetchAll,
     create,
-    update,
     remove
   }
 })

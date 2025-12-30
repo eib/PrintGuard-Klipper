@@ -2,7 +2,7 @@ import axios from 'axios'
 import { useSystemStore } from '../store/system'
 import type { 
   Connection, ConnectionCreate, ConnectionUpdate,
-  Component, ComponentCreate, ComponentUpdate,
+  Component, ComponentCreate,
   Printer, PrinterCreate, PrinterUpdate,
   HealthStatus, Entity, ProviderSchema,
   User, M2MApplication
@@ -58,7 +58,6 @@ export const componentsApi = {
   list: (filters?: any) => api.get<Component[]>('/components', { params: filters }),
   get: (id: string) => api.get<Component>(`/components/${id}`),
   create: (data: ComponentCreate) => api.post<Component>('/components', data),
-  update: (id: string, data: ComponentUpdate) => api.put<Component>(`/components/${id}`, data),
   delete: (id: string, force = false) => api.delete(`/components/${id}`, { params: { force } }),
   health: (id: string) => api.get<HealthStatus>(`/components/${id}/health`),
   printers: (id: string) => api.get<any[]>(`/components/${id}/printers`),

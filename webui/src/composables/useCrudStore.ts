@@ -3,7 +3,7 @@ import { ref, type Ref } from 'vue'
 interface CrudApi<T, C, U> {
   list: (params?: any) => Promise<{ data: T[] }>
   create: (data: C) => Promise<{ data: T }>
-  update: (id: string, data: U) => Promise<{ data: T }>
+  update?: (id: string, data: U) => Promise<{ data: T }>
   delete: (id: string, ...args: any[]) => Promise<any>
 }
 
@@ -35,6 +35,7 @@ export function useCrudStore<T extends { id: string }, C, U>(
   }
 
   async function update(id: string, data: U): Promise<T> {
+    if (!api.update) throw new Error('Update not implemented for this resource')
     const response = await api.update(id, data)
     const index = items.value.findIndex(item => item.id === id)
     if (index !== -1) {

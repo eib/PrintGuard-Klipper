@@ -7,7 +7,7 @@ from sqlalchemy.orm import selectinload
 
 from ...core.database import get_db
 from ...core.db_models import Component, PrinterComponentLink
-from ...core.models import ComponentCreate, ComponentUpdate, ComponentInfo, FeedSettings
+from ...core.models import ComponentCreate, ComponentInfo, FeedSettings
 from ...core.model import get_model
 from ...core.inference import predict
 from ...providers import get_provider
@@ -116,59 +116,6 @@ async def create_component(
         entity_config=entity_config
     )
     db.add(component)
-    await db.commit()
-    await db.refresh(component)
-    return ComponentInfo(
-        id=component.id,
-        name=component.name,
-        type=component.type,
-        provider=component.provider,
-        entity_config=component.entity_config or {}
-    )
-
-@router.put("/{id}", response_model=ComponentInfo)
-async def update_component(
-    id: str,
-    request: ComponentUpdate,
-    db: AsyncSession = Depends(get_db),
-    _: any = Security(get_current_identity, scopes=["printer:write"])
-):
-    """Update component config."""
-    result = await db.execute(select(Component).where(Component.id == id))
-    component = result.scalar_one_or_none()
-    if not component:
-        raise HTTPException(status_code=404, detail="Component not found")
-    
-    if request.name is not None:
-        component.name = request.name
-    if request.entity_config is not None:
-        # Validation for entity type match
-        entity_id = request.entity_config.get("entity_id")
-        if entity_id and "." in entity_id:
-            if not is_valid_entity(component.type, entity_id):
-                raise HTTPException(
-                    status_code=400, 
-                    detail=f"Entity {entity_id} is not valid for component type {component.type}"
-                )
-
-        prov_cls = get_provider(component.provider)
-        if prov_cls:
-            full_config = {**(component.entity_config or {}), **request.entity_config}
-            if component.connection_id:
-                from ...core.db_models import Connection
-                res = await db.execute(select(Connection).where(Connection.id == component.connection_id))
-                conn = res.scalar_one_or_none()
-                if conn:
-                    full_config.update(conn.config)
-            
-            if not await prov_cls.validate_component(full_config):
-                raise HTTPException(
-                    status_code=400, 
-                    detail=f"Configuration validation failed for provider {component.provider}. Ensure all required fields (like state labels) are provided and the entity exists."
-                )
-
-        component.entity_config.update(request.entity_config)
-        
     await db.commit()
     await db.refresh(component)
     return ComponentInfo(

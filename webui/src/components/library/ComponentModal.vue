@@ -14,7 +14,6 @@ import type { Component, ComponentCreate } from '../../types'
 
 const props = defineProps<{
   show: boolean
-  component?: Component | null
   initialType?: 'camera' | 'control' | 'status'
 }>()
 
@@ -112,23 +111,16 @@ async function fetchConnectionEntities() {
 watch(() => props.show, async (show) => {
   if (!show) return
   
-  if (props.component) {
-    formData.value = { ...props.component, entity_config: { ...props.component.entity_config } }
-    await fetchConnectionEntities()
-    await fetchEntityDetails()
-    step.value = 3
-  } else {
-    formData.value = {
-      name: '',
-      type: props.initialType || 'camera',
-      provider: 'homeassistant',
-      connection_id: undefined,
-      entity_config: {}
-    }
-    entityDetails.value = null
-    connectionEntities.value = []
-    step.value = 1
+  formData.value = {
+    name: '',
+    type: props.initialType || 'camera',
+    provider: 'homeassistant',
+    connection_id: undefined,
+    entity_config: {}
   }
+  entityDetails.value = null
+  connectionEntities.value = []
+  step.value = 1
 })
 
 async function nextStep() {
@@ -168,12 +160,8 @@ async function handleSave() {
       entity_config: formData.value.entity_config || {}
     }
 
-    if (props.component) {
-      await store.update(props.component.id, data)
-    } else {
-      const created = await store.create(data)
-      emit('created', created)
-    }
+    const created = await store.create(data)
+    emit('created', created)
     emit('close')
   } catch (e: any) {
     error.value = e.response?.data?.detail || 'Failed to save component'
@@ -196,7 +184,7 @@ async function onEntityIdChange(value: string | number) {
 <template>
   <BaseModal
     :show="show"
-    :title="component ? 'Edit Component' : 'Add Component'"
+    title="Add Component"
     @close="emit('close')"
   >
     <div :class="$style.steps">
