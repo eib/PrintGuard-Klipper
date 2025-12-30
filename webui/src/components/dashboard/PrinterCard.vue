@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed } from 'vue'
+import { ref, computed } from 'vue'
 import LiveFeed from './LiveFeed.vue'
 import InferenceTimeline from './InferenceTimeline.vue'
 import { usePrintersStore } from '../../store/printers'
-import { streamsApi, notificationsApi } from '../../services/api'
+import { notificationsApi } from '../../services/api'
 import { subscribeUserToPush } from '../../services/notifications'
+import { usePrinterSocket } from '../../composables/usePrinterSocket'
 import IconButton from '../ui/IconButton.vue'
 import Button from '../ui/Button.vue'
 import Badge from '../ui/Badge.vue'
@@ -20,37 +21,14 @@ const emit = defineEmits<{
 }>()
 
 const store = usePrintersStore()
-const prediction = ref<any>(null)
 const showTimeline = ref(false)
-let pollTimer: any = null
+
+// WebSocket for real-time updates
+const { connected, prediction, timelineResults } = usePrinterSocket(props.printer.id)
 
 const threshold = computed(() => {
   const sensitivity = props.printer.inference_sensitivity || 1.0
   return 50 / sensitivity
-})
-
-async function pollResults() {
-  try {
-    const response = await streamsApi.result(props.printer.id)
-    prediction.value = response.data
-    
-    if (prediction.value.inference_paused !== undefined && 
-        prediction.value.inference_paused !== props.printer.inference_paused) {
-      const index = store.printers.findIndex(p => p.id === props.printer.id)
-      if (index !== -1) {
-        store.printers[index].inference_paused = prediction.value.inference_paused
-      }
-    }
-  } catch (e) {
-  }
-}
-
-onMounted(() => {
-  pollTimer = setInterval(pollResults, 2000)
-})
-
-onUnmounted(() => {
-  if (pollTimer) clearInterval(pollTimer)
 })
 
 async function sendCmd(cmd: string) {
@@ -124,20 +102,20 @@ async function sendTestNotification() {
           {{ printer.status }}
         </Badge>
       </div>
-      <div v-if="prediction" :class="$style.inferenceWrapper">
-        <template v-if="prediction.status === 'success'">
+      <div :class="$style.inferenceWrapper">
+        <template v-if="prediction && prediction.class_name">
           <div :class="[$style.inference, $style[prediction.class_name]]">
             <span :class="$style.icon">{{ prediction.class_name === 'defect' ? '⚠️' : '✅' }}</span>
             <span :class="$style.text">{{ prediction.class_name }}</span>
           </div>
           <div :class="$style.fpsMetric">
-            {{ (printer.inference_paused || prediction.inference_paused) ? '-' : (prediction.actual_fps?.toFixed(1) || '0.0') }} det/s
+            {{ printer.inference_paused ? '-' : (prediction.actual_fps?.toFixed(1) || '0.0') }} det/s
           </div>
         </template>
-        <template v-else-if="prediction.status === 'waiting'">
+        <template v-else>
           <div :class="[$style.inference, $style.waiting]">
             <span :class="$style.icon">⏳</span>
-            <span :class="$style.text">Waiting...</span>
+            <span :class="$style.text">{{ connected ? 'Waiting...' : 'Connecting...' }}</span>
           </div>
           <div :class="$style.fpsMetric">- det/s</div>
         </template>
@@ -148,7 +126,7 @@ async function sendTestNotification() {
       <LiveFeed :printerId="printer.id" :camera="printer.components?.camera" />
       <div v-if="showTimeline" :class="$style.timelineOverlay">
         <InferenceTimeline
-          :timelineResults="prediction?.timeline_results"
+          :timelineResults="timelineResults"
           :threshold="threshold"
         />
       </div>
@@ -160,7 +138,7 @@ async function sendTestNotification() {
           variant="default"
           size="sm"
           title="Start"
-          :disabled="!printer.has_control || printer.status === 'printing'"
+          :disabled="!printer.available_commands?.includes('start')"
           @click="sendCmd('start')"
         >
           <Play :size="16" />
@@ -169,7 +147,7 @@ async function sendTestNotification() {
           variant="default"
           size="sm"
           title="Pause"
-          :disabled="!printer.has_control || printer.status !== 'printing'"
+          :disabled="!printer.available_commands?.includes('pause')"
           @click="sendCmd('pause')"
         >
           <Pause :size="16" />
@@ -178,7 +156,7 @@ async function sendTestNotification() {
           variant="danger"
           size="sm"
           title="Stop"
-          :disabled="!printer.has_control || printer.status === 'idle'"
+          :disabled="!printer.available_commands?.includes('stop')"
           @click="sendCmd('stop')"
         >
           <Square :size="16" />
@@ -464,3 +442,4 @@ async function sendTestNotification() {
   }
 }
 </style>
+

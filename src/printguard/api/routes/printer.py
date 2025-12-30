@@ -2,7 +2,6 @@
 
 import logging
 from typing import Optional, Annotated
-from pydantic import BaseModel
 from fastapi import APIRouter, HTTPException, Security, Depends, Query
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
@@ -16,64 +15,33 @@ from ...core.db_models import Printer, Component, PrinterComponentLink, PrinterN
 from ...core.model import get_model
 from ...core.inference import predict
 from ...providers import list_providers as get_available_providers, get_provider
-from ...providers.base import StatusSource, CameraSource, ControlSink
 from ...services.webrtc import start_track_processing
 from ...services.streams import stream_manager
-from ...services.component_resolver import resolve_component
-from ...services.defect_handler import handle_defect
-from ...services.settings_sync import sync_stream_settings
+from ...services.printer_service import (
+    get_instance,
+    set_inference_state,
+    execute_command,
+    handle_defect,
+    sync_settings,
+    invalidate_cache
+)
 from ..crypto_utils import EncryptedRoute
 from ..auth_utils import get_current_identity
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/printer", tags=["printer"], route_class=EncryptedRoute)
 
-
-class PrinterInstance(BaseModel):
-    """Internal runtime state of a printer."""
-    config: PrinterConfig
-    status: Optional[StatusSource] = None
-    camera: Optional[CameraSource] = None
-    control: Optional[ControlSink] = None
-
-    model_config = {"arbitrary_types_allowed": True}
-
-
-_printers: dict[str, PrinterInstance] = {}
-
-
-async def _get_or_create_printer_instance(printer_id: str, db: AsyncSession) -> Optional[PrinterInstance]:
-    """Get printer instance from cache or initialize from DB."""
-    if printer_id in _printers:
-        return _printers[printer_id]
-    result = await db.execute(
-        select(Printer).where(Printer.id == printer_id).options(
-            selectinload(Printer.component_links)
-            .joinedload(PrinterComponentLink.component)
-            .selectinload(Component.connection)
-        )
-    )
-    db_printer = result.scalar_one_or_none()
-    if not db_printer:
-        return None
-    comp_map = {link.role: link.component for link in db_printer.component_links}
-    config = PrinterConfig(
-        id=db_printer.id,
-        name=db_printer.name,
-        components={role: ComponentConfig(id=c.id, provider=c.provider, config=c.config) for role, c in comp_map.items()},
-        client_public_key=db_printer.client_public_key,
-        inference_sensitivity=db_printer.inference_sensitivity,
-        inference_majority_voting=db_printer.inference_majority_voting,
-        inference_target_fps=db_printer.inference_target_fps,
-        detection_action=db_printer.detection_action,
-        inference_paused=db_printer.inference_paused,
-        auto_detection=getattr(db_printer, "auto_detection", False)
-    )
-    instance = PrinterInstance(config=config)
-    for role, db_comp in comp_map.items():
-        setattr(instance, role, await resolve_component(db_comp, db))
-    _printers[printer_id] = instance
-    return instance
+def _components_dict(components) -> dict:
+    """
+    Convert PrinterComponents (which may have extra keys like 'control:stop') into a dict.
+    """
+    if components is None:
+        return {}
+    if isinstance(components, dict):
+        return {k: v for k, v in components.items() if v is not None}
+    if hasattr(components, "model_dump"):
+        return {k: v for k, v in components.model_dump(exclude_none=True).items() if v is not None}
+    return {k: getattr(components, k) for k in dir(components) if not k.startswith("_")}
 
 
 @router.get("/providers")
@@ -115,9 +83,7 @@ async def register_printer(
         db_printer.id = config.id
     db.add(db_printer)
     await db.flush()
-    roles = ["status", "camera", "control"]
-    for role in roles:
-        comp_data = getattr(config.components, role)
+    for role, comp_data in _components_dict(config.components).items():
         if not comp_data:
             continue
         db_comp = None
@@ -186,27 +152,23 @@ async def update_printer(
         for link in db_printer.component_links:
             await db.delete(link)
         await db.flush()
-        roles = ["status", "camera", "control"]
-        for role in roles:
-            comp_id = getattr(config.components, role)
+        for role, comp_id in _components_dict(config.components).items():
             if not comp_id:
                 continue
             res = await db.execute(select(Component).where(Component.id == comp_id))
             if not res.scalar_one_or_none():
                 raise HTTPException(status_code=400, detail=f"Component {comp_id} not found")
-                
-            link = PrinterComponentLink(
-                printer_id=db_printer.id,
-                component_id=comp_id,
-                role=role
+            db.add(
+                PrinterComponentLink(
+                    printer_id=db_printer.id,
+                    component_id=comp_id,
+                    role=role
+                )
             )
-            db.add(link)
             
     await db.commit()
-    if printer_id in _printers:
-        _printers.pop(printer_id)
-
-    sync_stream_settings(
+    invalidate_cache(printer_id)
+    sync_settings(
         printer_id,
         db_printer.inference_sensitivity,
         db_printer.inference_majority_voting,
@@ -237,7 +199,7 @@ async def get_printer(
     endpoint: Annotated[Optional[str], Query()] = None
 ) -> PrinterInfo:
     """Get printer status."""
-    instance = await _get_or_create_printer_instance(printer_id, db)
+    instance = await get_instance(printer_id, db)
     if not instance:
         raise HTTPException(status_code=404, detail="Printer not found")
     
@@ -289,6 +251,7 @@ async def get_printer(
         status=status,
         linked_session_id=instance.config.linked_session_id,
         has_control=instance.control is not None,
+        available_commands=instance.available_commands,
         has_camera=instance.camera is not None,
         components=components_info,
         inference_sensitivity=instance.config.inference_sensitivity,
@@ -310,7 +273,7 @@ async def link_printer_stream(
     _: any = Security(get_current_identity, scopes=["printer:write", "rtc:stream"])
 ) -> dict:
     """Ensure printer camera is multiplexed and active."""
-    instance = await _get_or_create_printer_instance(printer_id, db)
+    instance = await get_instance(printer_id, db)
     if not instance:
         raise HTTPException(status_code=404, detail="Printer not found")
 
@@ -328,7 +291,7 @@ async def link_printer_stream(
     
     source = stream_manager.get_source(printer_id)
     if source:
-        sync_stream_settings(
+        sync_settings(
             printer_id,
             instance.config.inference_sensitivity,
             instance.config.inference_majority_voting,
@@ -343,7 +306,7 @@ async def link_printer_stream(
     if not track:
         result = await db.execute(
             select(Printer).where(Printer.id == printer_id).options(
-                selectinload(Printer.component_links)
+                selectinload(PrinterComponentLink.component)
                 .joinedload(PrinterComponentLink.component)
             )
         )
@@ -364,7 +327,8 @@ async def link_printer_stream(
     from ...services.notifications import notify_user_camera_access
     model_info = get_model()
     processor = await start_track_processing(track, predict, model_info, settings, session_id)
-    
+    processor.printer_id = printer_id
+
     async def on_defect(class_name: str, confidence: float, screenshot_path: str = None):
         await handle_defect(
             printer_id=printer_id,
@@ -374,7 +338,7 @@ async def link_printer_stream(
             screenshot_path=screenshot_path,
             detection_action=settings.detection_action
         )
-    
+
     processor.on_defect = on_defect
 
     if processor.relayed_track:
@@ -406,8 +370,7 @@ async def remove_printer(
         raise HTTPException(status_code=404, detail="Printer not found")
     await db.delete(db_printer)
     await db.commit()
-    if printer_id in _printers:
-        _printers.pop(printer_id)
+    invalidate_cache(printer_id)
     return {"status": "removed", "id": printer_id}
 
 
@@ -419,17 +382,10 @@ async def printer_command(
     _: any = Security(get_current_identity, scopes=["printer:write"])
 ) -> dict:
     """Send command to printer."""
-    instance = await _get_or_create_printer_instance(printer_id, db)
-    if not instance:
-        raise HTTPException(status_code=404, detail="Printer not found")
-    if not instance.control:
-        raise HTTPException(status_code=400, detail="Printer does not support control")
-    if command == "start": await instance.control.start()
-    elif command == "pause": await instance.control.pause()
-    elif command == "resume": await instance.control.resume()
-    elif command == "stop": await instance.control.stop()
-    else: raise HTTPException(status_code=400, detail="Invalid command")
-    return {"status": "ok", "command": command}
+    try:
+        return await execute_command(printer_id, command, db)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.post("/{printer_id}/inference/{action}")
@@ -440,20 +396,6 @@ async def printer_inference_command(
     _: any = Security(get_current_identity, scopes=["printer:write"])
 ) -> dict:
     """Start or stop inference for a printer."""
-    result = await db.execute(select(Printer).where(Printer.id == printer_id))
-    db_printer = result.scalar_one_or_none()
-    if not db_printer:
-        raise HTTPException(status_code=404, detail="Printer not found")
-
-    paused = action == "stop"
-    db_printer.inference_paused = paused
-    await db.commit()
-
-    if printer_id in _printers:
-        _printers[printer_id].config.inference_paused = paused
-
-    source = stream_manager.get_source(printer_id)
-    if source and source.processor:
-        source.processor.pause_inference = paused
-
-    return {"status": "ok", "action": action, "inference_paused": paused}
+    running = action == "start"
+    await set_inference_state(printer_id, running, db)
+    return {"status": "ok", "action": action, "inference_paused": not running}

@@ -205,16 +205,30 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     ) -> FlowResult:
         """Handle selecting control entities to export."""
         if user_input is not None:
-            self._controls = user_input["controls"]
+            self._control_entities = {
+                "start": user_input.get("start_entity"),
+                "pause": user_input.get("pause_entity"),
+                "resume": user_input.get("resume_entity"),
+                "stop": user_input.get("stop_entity"),
+            }
             await self._export_components()
             return self.async_create_entry(title="PrintGuard", data=self._base_data)
 
         return self.async_show_form(
             step_id="controls",
             data_schema=vol.Schema({
-                vol.Required("controls"): selector.EntitySelector(
-                    selector.EntitySelectorConfig(domain=ALLOWED_DOMAINS["control"], multiple=True)
-                )
+                vol.Optional("start_entity"): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain=ALLOWED_DOMAINS["control"])
+                ),
+                vol.Optional("pause_entity"): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain=ALLOWED_DOMAINS["control"])
+                ),
+                vol.Optional("resume_entity"): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain=ALLOWED_DOMAINS["control"])
+                ),
+                vol.Optional("stop_entity"): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain=ALLOWED_DOMAINS["control"])
+                ),
             })
         )
 
@@ -251,16 +265,17 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     CONF_ERROR_STATES: self._base_data[CONF_ERROR_STATES],
                 }
             )
-            
-        # Export Controls
-        for entity_id in self._controls:
+
+        for action, entity_id in self._control_entities.items():
+            if not entity_id:
+                continue
             state = self.hass.states.get(entity_id)
-            name = state.name if state else entity_id
+            name = f"{state.name if state else entity_id} ({action})"
             await api_client.create_component(
                 name=name,
-                type="control",
+                type=f"control:{action}",
                 provider="homeassistant",
                 connection_id=conn_id,
-            entity_config={"entity_id": entity_id}
-        )
+                entity_config={"entity_id": entity_id}
+            )
 

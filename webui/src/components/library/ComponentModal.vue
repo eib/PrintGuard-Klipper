@@ -139,6 +139,12 @@ async function handleSave() {
   error.value = null
   
   // Validation
+  if (formData.value.type === 'control') {
+    error.value = 'Please select a control action'
+    loading.value = false
+    return
+  }
+
   if (formData.value.connection_id && !formData.value.entity_config?.entity_id) {
     error.value = 'Please select an entity'
     loading.value = false
@@ -199,12 +205,29 @@ async function onEntityIdChange(value: string | number) {
         <button
           v-for="t in ['camera', 'control', 'status']"
           :key="t"
-          :class="[$style.typeBtn, { [$style.typeActive]: formData.type === t }]"
-          @click="formData.type = t as any; nextStep()"
+          :class="[$style.typeBtn, { [$style.typeActive]: formData.type === t || (t === 'control' && formData.type.startsWith('control:')) }]"
+          @click="formData.type = t as any; if (t !== 'control') nextStep()"
         >
           <span :class="$style.typeIcon">{{ t === 'camera' ? '📷' : t === 'control' ? '🎮' : '📊' }}</span>
           <span :class="$style.typeName">{{ t }}</span>
         </button>
+      </div>
+
+      <div v-if="formData.type === 'control' || formData.type.startsWith('control:')" :class="$style.subtypeSelector">
+        <label>Control Action*</label>
+        <Select
+          :modelValue="formData.type.includes(':') ? formData.type : ''"
+          :options="[
+            { value: 'control:start', label: 'Start Button' },
+            { value: 'control:pause', label: 'Pause Button' },
+            { value: 'control:resume', label: 'Resume Button' },
+            { value: 'control:stop', label: 'Stop Button' }
+          ]"
+          @update:modelValue="(val) => { formData.type = val as any; if (val) nextStep(); }"
+          placeholder="Select an action..."
+          fullWidth
+        />
+        <small :class="$style.helpText">Specify which action this component handles.</small>
       </div>
     </div>
 
@@ -381,6 +404,20 @@ async function onEntityIdChange(value: string | number) {
   font-weight: var(--font-weight-semibold);
   text-transform: capitalize;
   color: var(--text-primary);
+}
+
+.subtypeSelector {
+  margin-top: var(--space-4);
+  padding: var(--space-4);
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-lg);
+}
+
+.helpText {
+  display: block;
+  margin-top: var(--space-2);
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
 }
 
 .configForm {

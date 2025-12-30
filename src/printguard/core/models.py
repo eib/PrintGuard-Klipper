@@ -220,6 +220,7 @@ class PrinterComponents(BaseModel):
     status: Optional[ComponentConfig | str] = None
     camera: Optional[ComponentConfig | str] = None
     control: Optional[ComponentConfig | str] = None
+    model_config = {"extra": "allow"}
 
 
 class PrinterConfig(BaseModel):
@@ -244,6 +245,7 @@ class PrinterInfo(BaseModel):
     status: PrinterStatus
     linked_session_id: Optional[str] = None
     has_control: bool = False
+    available_commands: list[str] = []
     has_camera: bool = False
     components: Optional[dict[str, ComponentInfo]] = None
     inference_sensitivity: float = 1.0

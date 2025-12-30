@@ -13,7 +13,7 @@ from ...core.inference import predict
 from ...providers import get_provider
 from ...services.webrtc import start_track_processing
 from ...services.streams import stream_manager
-from ...services.component_resolver import build_component_config
+from ...services.component_resolver import build_component_config, resolve_component
 from ...services.component_validator import is_valid_entity
 from ..auth_utils import get_current_identity
 from ..crypto_utils import EncryptedRoute
@@ -77,8 +77,13 @@ async def create_component(
 ):
     """Create a new component."""
     entity_config = request.entity_config or {}
-    
-    # 1. Domain Validation (mostly for Home Assistant)
+
+    if request.type.startswith("control") and ":" not in request.type:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Control components must specify a subtype (e.g. control:start, control:stop). Got: {request.type}"
+        )
+
     entity_id = entity_config.get("entity_id")
     if entity_id and "." in entity_id:
         if not is_valid_entity(request.type, entity_id):
@@ -207,13 +212,9 @@ async def link_component_stream(
         stream_manager.add_alias(id, session_id)
         return {"status": "success", "session_id": session_id, "multiplexed": True}
 
-    prov_cls = get_provider(db_comp.provider)
-    if not prov_cls:
-        raise HTTPException(status_code=400, detail=f"Provider {db_comp.provider} not found")
-    
-    config = build_component_config(db_comp)
-    
-    instance = prov_cls(**config)
+    instance = await resolve_component(db_comp, db)
+    if not instance:
+        raise HTTPException(status_code=400, detail=f"Provider {db_comp.provider} not found or failed to initialize")
     track, pc = await instance.get_camera_track()
     
     if not track:

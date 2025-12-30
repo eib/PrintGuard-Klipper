@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import BaseModal from '../shared/BaseModal.vue'
 import ComponentSelector from '../shared/ComponentSelector.vue'
 import ComponentModal from '../library/ComponentModal.vue'
@@ -25,6 +25,10 @@ const loading = ref(false)
 const error = ref<string | null>(null)
 const notificationsEnabled = ref(false)
 
+const hasControl = computed(() => 
+  Object.keys(formData.value.components).some(k => k.startsWith('control:') && formData.value.components[k])
+)
+
 const showCompModal = ref(false)
 const activeCompType = ref<'camera' | 'control' | 'status'>('camera')
 
@@ -33,7 +37,6 @@ const formData = ref<PrinterCreate>({
   components: {
     camera: '',
     status: null,
-    control: null
   },
   inference_sensitivity: 1.0,
   inference_majority_voting: 1,
@@ -53,7 +56,6 @@ watch([() => props.show, () => props.printer], ([show, printer]) => {
         components: {
           camera: comps.camera?.id || '',
           status: comps.status?.id || null,
-          control: comps.control?.id || null
         },
         inference_sensitivity: printer.inference_sensitivity ?? 1.0,
         inference_majority_voting: printer.inference_majority_voting ?? 1,
@@ -61,6 +63,14 @@ watch([() => props.show, () => props.printer], ([show, printer]) => {
         detection_action: printer.detection_action ?? 'none',
         auto_detection: printer.auto_detection ?? false
       }
+
+      // Load control components
+      Object.keys(comps).forEach(role => {
+        if (role.startsWith('control:')) {
+          formData.value.components[role] = comps[role]?.id || null
+        }
+      })
+
       notificationsEnabled.value = printer.notifications_enabled || false
     } else {
       formData.value = {
@@ -68,7 +78,6 @@ watch([() => props.show, () => props.printer], ([show, printer]) => {
         components: {
           camera: '',
           status: null,
-          control: null
         },
         inference_sensitivity: 1.0,
         inference_majority_voting: 1,
@@ -81,15 +90,17 @@ watch([() => props.show, () => props.printer], ([show, printer]) => {
   }
 }, { immediate: true })
 
-function openAddNew(type: 'camera' | 'control' | 'status') {
-  activeCompType.value = type
+function openAddNew(type: string) {
+  activeCompType.value = type.includes(':') ? 'control' : type as any
   showCompModal.value = true
 }
 
 function onComponentCreated(comp: any) {
   if (comp.type === 'camera') formData.value.components.camera = comp.id
   else if (comp.type === 'status') formData.value.components.status = comp.id
-  else if (comp.type === 'control') formData.value.components.control = comp.id
+  else if (comp.type === 'control' || comp.type.startsWith('control:')) {
+    formData.value.components[comp.type] = comp.id
+  }
 
   showCompModal.value = false
 }
@@ -99,6 +110,9 @@ async function handleSave() {
     error.value = 'Camera is required'
     return
   }
+
+  const hasControlValue = formData.value.components.control || 
+                     Object.keys(formData.value.components).some(k => k.startsWith('control:') && formData.value.components[k]);
 
   loading.value = true
   error.value = null
@@ -120,8 +134,8 @@ async function handleSave() {
   }
 }
 
-watch(() => formData.value.components.control, (newControl) => {
-  if (!newControl) {
+watch(hasControl, (newHasControl) => {
+  if (!newHasControl) {
     formData.value.detection_action = 'none'
   }
 })
@@ -174,12 +188,18 @@ watch(() => formData.value.components.status, (newStatus) => {
 
       <div class="form-field">
         <label>Control Source (Optional)</label>
-        <ComponentSelector
-          type="control"
-          v-model="formData.components.control"
-          @add-new="openAddNew('control')"
-          placeholder="No control source selected"
-        />
+        <div :class="$style.controlGroups">
+          <div v-for="action in (['start', 'pause', 'resume', 'stop'] as const)" :key="action" :class="$style.controlGroup">
+            <label :class="$style.subLabel">{{ action.charAt(0).toUpperCase() + action.slice(1) }}</label>
+            <ComponentSelector
+              :type="('control:' + action) as any"
+              :modelValue="formData.components['control:' + action] ? String(formData.components['control:' + action]) : null"
+              @update:modelValue="(val) => formData.components['control:' + action] = val"
+              @add-new="openAddNew('control:' + action)"
+              placeholder="None"
+            />
+          </div>
+        </div>
       </div>
 
       <div class="form-section-title">Inference Settings</div>
@@ -187,46 +207,45 @@ watch(() => formData.value.components.status, (newStatus) => {
       <div class="form-row">
         <div class="form-field">
           <label for="sensitivity">Sensitivity</label>
-          <Input
-            id="sensitivity"
-            type="number"
-            step="0.1"
-            v-model.number="formData.inference_sensitivity"
-            placeholder="1.0"
-          />
-          <small class="field-help">Higher = more likely to detect defects (defaults to 1.0)</small>
-        </div>
-
-        <div class="form-field">
-          <label for="majority_voting">Majority Voting</label>
-          <Input
-            id="majority_voting"
-            type="number"
-            v-model.number="formData.inference_majority_voting"
-            placeholder="1"
-          />
-          <small class="field-help">Number of inferences to average</small>
-        </div>
+        <Input
+          id="sensitivity"
+          type="number"
+          step="0.1"
+          v-model.number="formData.inference_sensitivity"
+          placeholder="1.0"
+        />
+        <small :class="$style.fieldHelp">Higher = more likely to detect defects (defaults to 1.0)</small>
       </div>
 
       <div class="form-field">
-        <label for="target_fps">Target Detections Per Second</label>
+        <label for="majority_voting">Majority Voting</label>
         <Input
-          id="target_fps"
+          id="majority_voting"
           type="number"
-          step="0.1"
-          v-model.number="formData.inference_target_fps"
-          placeholder="5.0"
+          v-model.number="formData.inference_majority_voting"
+          placeholder="1"
         />
-        <small class="field-help">Limit the number of inferences per second</small>
+        <small :class="$style.fieldHelp">Number of inferences to average</small>
       </div>
+    </div>
+
+    <div class="form-field">
+      <label for="target_fps">Target Detections Per Second</label>
+      <Input
+        id="target_fps"
+        type="number"
+        step="0.1"
+        v-model.number="formData.inference_target_fps"
+        placeholder="5.0"
+      />
+      <small :class="$style.fieldHelp">Limit the number of inferences per second</small>
+    </div>
 
       <div class="form-field">
         <label for="detection-action">Action on Defect</label>
         <Select
           id="detection-action"
           v-model="formData.detection_action"
-          :disabled="!formData.components.control"
           :options="[
             { value: 'none', label: 'None (Notification Only)' },
             { value: 'pause', label: 'Pause Print' },
@@ -234,20 +253,20 @@ watch(() => formData.value.components.status, (newStatus) => {
           ]"
           full-width
         />
-        <small class="field-help" v-if="!formData.components.control">
-          Requires a Control Source to be configured.
-        </small>
-        <small class="field-help" v-else>
-          Choose what happens automatically when a defect is detected.
-        </small>
-      </div>
+          <small :class="$style.fieldHelp" v-if="!hasControl">
+            Requires a Control Source to be configured.
+          </small>
+          <small :class="$style.fieldHelp" v-else>
+            Choose what happens automatically when a defect is detected.
+          </small>
+        </div>
 
       <div class="form-field" v-if="formData.components.status">
         <label :class="$style.checkboxLabel">
           <input type="checkbox" v-model="formData.auto_detection" />
           Auto start/stop detection based on printing status
         </label>
-        <small class="field-help">
+        <small :class="$style.fieldHelp">
           Requires a Status Source. Detection will start when printing and stop when not printing.
         </small>
       </div>
@@ -258,7 +277,7 @@ watch(() => formData.value.components.status, (newStatus) => {
           <input type="checkbox" v-model="notificationsEnabled" />
           Notify me of defects on this printer
         </label>
-        <small class="field-help">Requires browser notification permission.</small>
+        <small :class="$style.fieldHelp">Requires browser notification permission.</small>
       </div>
 
       <div v-if="error" class="form-error">{{ error }}</div>
@@ -300,7 +319,7 @@ watch(() => formData.value.components.status, (newStatus) => {
   gap: 1rem;
 }
 
-.field-help {
+.fieldHelp {
   display: block;
   font-size: 0.75rem;
   color: var(--text-secondary);
@@ -319,6 +338,29 @@ watch(() => formData.value.components.status, (newStatus) => {
 .checkboxLabel input {
   width: 1rem;
   height: 1rem;
+}
+
+.controlGroups {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1rem;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-lg);
+}
+
+.controlGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.subLabel {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 /* ============================================

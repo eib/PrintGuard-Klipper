@@ -14,7 +14,7 @@ from ...core.models import (
 )
 from ...services.webrtc import create_peer_connection, create_viewer_connection
 from ...services.streams import stream_manager
-from ...services.defect_handler import handle_defect
+from ...services.printer_service import handle_defect
 from ..crypto_utils import EncryptedRoute
 from ..auth_utils import get_current_identity
 
@@ -109,8 +109,10 @@ async def rtc_offer(
     pc, processor = await create_peer_connection(
         sdp, predict, model_info, settings, offer.session_id
     )
-    
+
     if offer.printer_id:
+        processor.printer_id = offer.printer_id
+
         async def on_defect(class_name: str, confidence: float, screenshot_path: str = None):
             await handle_defect(
                 printer_id=offer.printer_id,
@@ -120,7 +122,7 @@ async def rtc_offer(
                 screenshot_path=screenshot_path,
                 detection_action=settings.detection_action
             )
-        
+
         processor.on_defect = on_defect
 
     if processor.relayed_track:

@@ -14,6 +14,7 @@ from .core.config import get_settings
 from .core.model import download_model, load_model
 from .core.database import init_db
 from .api.routes import router
+from .api.routes.ws import router as ws_router
 from .services.webrtc import cleanup
 from .services.tunnel_manager import setup_active_tunnel
 from .services.storage import screenshot_manager
@@ -95,6 +96,7 @@ app = FastAPI(
 )
 
 app.include_router(router, prefix="/api")
+app.include_router(ws_router, prefix="/api")
 
 webui_dist = os.path.join(os.getcwd(), "webui", "dist")
 if os.path.exists(webui_dist):

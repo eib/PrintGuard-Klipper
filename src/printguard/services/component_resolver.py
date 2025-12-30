@@ -22,19 +22,17 @@ async def resolve_component(comp: Component, db: AsyncSession) -> Any:
         Instantiated provider or None if failed
     """
     provider = comp.provider
-    config = {}
-    
+    config: dict[str, Any] = {}
+
     if comp.connection_id:
-        if not comp.connection:
-            res = await db.execute(
-                select(Connection).where(Connection.id == comp.connection_id)
-            )
-            comp.connection = res.scalar_one_or_none()
-            
-        if comp.connection:
-            config.update(comp.connection.config)
-            
+        res = await db.execute(select(Connection).where(Connection.id == comp.connection_id))
+        conn = res.scalar_one_or_none()
+        if conn:
+            config.update(conn.config or {})
+
     config.update(comp.entity_config or {})
+    for k in ("type", "name", "id"):
+        config.pop(k, None)
 
     prov_cls = get_provider(provider)
     if not prov_cls:
@@ -55,11 +53,10 @@ def build_component_config(comp: Component) -> dict:
         comp: Component with optionally loaded connection
         
     Returns:
-        Merged configuration dictionary
+        Merged configuration dictionary with metadata filtered out
     """
-    config = {}
-    if comp.connection:
-        config.update(comp.connection.config)
+    config: dict[str, Any] = {}
     config.update(comp.entity_config or {})
-    return config
+    metadata_fields = {'type', 'name', 'id'}
+    return {k: v for k, v in config.items() if k not in metadata_fields}
 

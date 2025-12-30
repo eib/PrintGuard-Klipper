@@ -22,11 +22,21 @@ async def async_setup_entry(
     entities = [PrintGuardRefreshButton(coordinator)]
     
     for p_id, p_data in coordinator.data.items():
-        if p_data["info"].get("has_control"):
+        info = p_data["info"]
+        components = info.get("components", {})
+
+        control_actions = [k.split(":")[1] for k in components.keys() if k.startswith("control:")]
+        
+        if control_actions:
+            for action in control_actions:
+                entities.append(
+                    PrintGuardControlButton(coordinator, p_id, info["name"], action)
+                )
+        elif info.get("has_control"):
             for command in ["start", "pause", "resume", "stop"]:
                 entities.append(
                     PrintGuardControlButton(
-                        coordinator, p_id, p_data["info"]["name"], command
+                        coordinator, p_id, info["name"], command
                     )
                 )
     

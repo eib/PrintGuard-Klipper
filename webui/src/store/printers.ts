@@ -72,6 +72,27 @@ export const usePrintersStore = defineStore('printers', () => {
     }
   }
 
+  function syncPrinter(updatedPrinter: Printer) {
+    const index = printers.value.findIndex(p => p.id === updatedPrinter.id)
+    if (index !== -1) {
+      printers.value[index] = { ...printers.value[index], ...updatedPrinter }
+    }
+  }
+
+  function setInferencePaused(id: string, paused: boolean) {
+    const index = printers.value.findIndex(p => p.id === id)
+    if (index !== -1 && printers.value[index].inference_paused !== paused) {
+      printers.value[index].inference_paused = paused
+    }
+  }
+
+  function updateStatus(id: string, status: string) {
+    const index = printers.value.findIndex(p => p.id === id)
+    if (index !== -1) {
+      printers.value[index].status = status as any
+    }
+  }
+
   return {
     printers,
     loading,
@@ -82,7 +103,10 @@ export const usePrintersStore = defineStore('printers', () => {
     remove,
     sendCommand,
     toggleNotifications,
-    toggleInference
+    toggleInference,
+    syncPrinter,
+    setInferencePaused,
+    updateStatus
   }
 })
 

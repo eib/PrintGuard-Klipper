@@ -257,7 +257,7 @@ class HomeAssistantProvider(PrinterProvider):
         if not entity_id:
             return
         domain = entity_id.split(".")[0]
-        service = "press" if domain == "button" else "turn_on"
+        service = "press" if domain in ("button", "input_button") else "turn_on"
         if "stop" in entity_id or "cancel" in entity_id:
             if domain == "switch":
                 service = "turn_off"

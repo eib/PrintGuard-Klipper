@@ -189,7 +189,10 @@ async def list_connection_entities(
     
     entities = await prov_cls.list_entities(connection.config)
     if type:
-        entities = [e for e in entities if e["type"] == type]
+        entities = [
+            e for e in entities 
+            if e["type"] == type or (type.startswith("control:") and e["type"] == "control")
+        ]
     return entities
 
 @router.get("/{id}/entities/{entity_id}")

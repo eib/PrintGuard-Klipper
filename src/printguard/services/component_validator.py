@@ -4,7 +4,11 @@
 ALLOWED_DOMAINS = {
     "camera": ["camera"],
     "status": ["sensor", "binary_sensor", "input_select"],
-    "control": ["button", "switch", "input_button", "input_boolean"]
+    "control": ["button", "switch", "input_button", "input_boolean"],
+    "control:start": ["button", "switch", "input_button", "input_boolean"],
+    "control:pause": ["button", "switch", "input_button", "input_boolean"],
+    "control:resume": ["button", "switch", "input_button", "input_boolean"],
+    "control:stop": ["button", "switch", "input_button", "input_boolean"],
 }
 
 # Default state values for Home Assistant status components
@@ -49,6 +53,10 @@ def is_camera_entity(entity_id: str) -> bool:
 def is_status_entity(entity_id: str) -> bool:
     """Check if an entity ID is a status component."""
     return is_valid_entity("status", entity_id)
+
+def is_control_type(component_type: str) -> bool:
+    """Check if component type is a control or control subtype."""
+    return component_type == "control" or component_type.startswith("control:")
 
 def is_control_entity(entity_id: str) -> bool:
     """Check if an entity ID is a control component."""

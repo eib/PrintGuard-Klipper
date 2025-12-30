@@ -49,6 +49,7 @@ export interface Printer {
   status: PrinterStatus
   linked_session_id?: string
   has_control: boolean
+  available_commands: string[]
   has_camera: boolean
   components?: Record<string, ComponentInfo>
   inference_sensitivity: number
@@ -65,7 +66,8 @@ export interface PrinterCreate {
   components: {
     camera: string
     status: string | null
-    control: string | null
+    control?: string | null
+    [key: string]: string | null | undefined
   }
   inference_sensitivity: number
   inference_majority_voting: number

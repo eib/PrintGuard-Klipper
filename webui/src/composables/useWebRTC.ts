@@ -8,6 +8,32 @@ export function useWebRTC() {
   const error = ref<string | null>(null)
   const pc = ref<RTCPeerConnection | null>(null)
   const latestResult = ref<PredictionResult | null>(null)
+  const reconnecting = ref(false)
+  let lastSessionId: string | null = null
+  let reconnectAttempts = 0
+  let reconnectTimer: ReturnType<typeof setTimeout> | null = null
+
+  function clearReconnectTimer() {
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer)
+      reconnectTimer = null
+    }
+  }
+
+  function scheduleReconnect(reason: string) {
+    if (!lastSessionId) return
+    if (reconnectTimer) return
+
+    const delay = Math.min(10000, 750 * Math.pow(2, reconnectAttempts))
+    reconnectAttempts = Math.min(reconnectAttempts + 1, 6)
+    reconnecting.value = true
+    console.warn(`WebRTC: scheduling reconnect in ${delay}ms (${reason})`)
+
+    reconnectTimer = setTimeout(() => {
+      reconnectTimer = null
+      if (lastSessionId) connect(lastSessionId)
+    }, delay)
+  }
 
   function setupDataChannel(channel: RTCDataChannel) {
     channel.onmessage = (event) => {
@@ -20,6 +46,9 @@ export function useWebRTC() {
   }
 
   async function connect(sessionId: string) {
+    lastSessionId = sessionId
+    clearReconnectTimer()
+
     if (pc.value) {
       pc.value.close()
     }
@@ -27,6 +56,7 @@ export function useWebRTC() {
     try {
       connected.value = false
       error.value = null
+      reconnecting.value = false
 
       pc.value = new RTCPeerConnection({
         iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
@@ -47,10 +77,22 @@ export function useWebRTC() {
       }
 
       pc.value.onconnectionstatechange = () => {
-        if (pc.value?.connectionState === 'connected') {
+        const state = pc.value?.connectionState
+        if (state === 'connected') {
           connected.value = true
-        } else if (pc.value?.connectionState === 'failed') {
-          error.value = 'WebRTC connection failed'
+          reconnectAttempts = 0
+        } else if (state === 'disconnected' || state === 'failed') {
+          error.value = `WebRTC ${state}`
+          scheduleReconnect(state)
+        } else if (state === 'closed') {
+          connected.value = false
+        }
+      }
+
+      pc.value.oniceconnectionstatechange = () => {
+        const ice = pc.value?.iceConnectionState
+        if (ice === 'failed' || ice === 'disconnected') {
+          scheduleReconnect(`ice:${ice}`)
         }
       }
 
@@ -87,10 +129,15 @@ export function useWebRTC() {
     } catch (e: any) {
       error.value = e.message || 'Failed to connect'
       console.error('WebRTC error:', e)
+      scheduleReconnect('exception')
     }
   }
 
   function disconnect() {
+    clearReconnectTimer()
+    lastSessionId = null
+    reconnectAttempts = 0
+    reconnecting.value = false
     if (pc.value) {
       pc.value.close()
       pc.value = null
@@ -166,6 +213,7 @@ export function useWebRTC() {
   return {
     videoRef,
     connected,
+    reconnecting,
     error,
     latestResult,
     connect,
