@@ -1,8 +1,10 @@
-# 🛡️ PrintGuard
+# PrintGuard - Local 3D Printing Failure Detection and Monitoring
 
 **Local, real-time 3D printing failure detection and monitoring on edge devices.**
 
 PrintGuard uses computer vision and machine learning to detect 3D print failures as they happen, allowing for automatic intervention before wasting filament or damaging your printer.
+
+> _The machine learning model's training code and technical research paper can be found [here](https://github.com/oliverbravery/Edge-FDM-Fault-Detection)._
 
 ## 🚀 Quick Start (Docker)
 
