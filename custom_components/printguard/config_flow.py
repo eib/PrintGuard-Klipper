@@ -21,6 +21,7 @@ from .api import (
     PrintGuardApiClient,
 )
 from .const import (
+    ALLOWED_DOMAINS,
     CONF_CLIENT_ID,
     CONF_CLIENT_PRIVATE_KEY,
     CONF_CLIENT_PUBLIC_KEY,
@@ -160,7 +161,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="cameras",
             data_schema=vol.Schema({
                 vol.Required("cameras"): selector.EntitySelector(
-                    selector.EntitySelectorConfig(domain="camera", multiple=True)
+                    selector.EntitySelectorConfig(domain=ALLOWED_DOMAINS["camera"], multiple=True)
                 )
             })
         )
@@ -177,7 +178,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="sensors",
             data_schema=vol.Schema({
                 vol.Required("sensors"): selector.EntitySelector(
-                    selector.EntitySelectorConfig(domain=["sensor", "binary_sensor"], multiple=True)
+                    selector.EntitySelectorConfig(domain=ALLOWED_DOMAINS["status"], multiple=True)
                 )
             })
         )
@@ -212,7 +213,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="controls",
             data_schema=vol.Schema({
                 vol.Required("controls"): selector.EntitySelector(
-                    selector.EntitySelectorConfig(domain=["switch", "button"], multiple=True)
+                    selector.EntitySelectorConfig(domain=ALLOWED_DOMAINS["control"], multiple=True)
                 )
             })
         )

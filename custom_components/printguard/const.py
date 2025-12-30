@@ -14,6 +14,21 @@ CONF_PRINTING_STATES = "printing_states"
 CONF_PAUSED_STATES = "paused_states"
 CONF_ERROR_STATES = "error_states"
 
+# Component entity references
+CONF_CAMERA = "camera"
+CONF_START_ENTITY = "start_entity"
+CONF_PAUSE_ENTITY = "pause_entity"
+CONF_RESUME_ENTITY = "resume_entity"
+CONF_STOP_ENTITY = "stop_entity"
+CONF_PRINTER_NAME = "printer_name"
+
+# Mapping of component types to allowed entity domains
+ALLOWED_DOMAINS = {
+    "camera": ["camera"],
+    "status": ["sensor", "binary_sensor", "input_select"],
+    "control": ["button", "switch", "input_button", "input_boolean"]
+}
+
 # Polling interval (seconds)
 SCAN_INTERVAL_SECONDS = 10
 

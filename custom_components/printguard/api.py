@@ -14,17 +14,12 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .const import (
-    CONF_CAMERA,
     CONF_CLIENT_ID,
     CONF_CLIENT_PRIVATE_KEY,
     CONF_CLIENT_PUBLIC_KEY,
     CONF_CLIENT_SECRET,
-    CONF_PAUSE_ENTITY,
     CONF_PRINTER_NAME,
-    CONF_RESUME_ENTITY,
     CONF_SERVER_PUBLIC_KEY,
-    CONF_START_ENTITY,
-    CONF_STOP_ENTITY,
 )
 from .crypto import CryptoHandler
 

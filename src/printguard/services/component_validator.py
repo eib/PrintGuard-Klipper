@@ -4,8 +4,19 @@
 ALLOWED_DOMAINS = {
     "camera": ["camera"],
     "status": ["sensor", "binary_sensor", "input_select"],
-    "control": ["input_button", "input_boolean"]
+    "control": ["button", "switch", "input_button", "input_boolean"]
 }
+
+# Default state values for Home Assistant status components
+DEFAULT_STATE_VALUES = {
+    "printing_state": "printing",
+    "paused_state": "paused",
+    "error_state": "error"
+}
+
+def get_default_state_value(state_type: str) -> str:
+    """Return the default value for a given state type."""
+    return DEFAULT_STATE_VALUES.get(state_type, "")
 
 def get_allowed_domains(component_type: str) -> list[str]:
     """Return the list of allowed entity domains for a given component type."""

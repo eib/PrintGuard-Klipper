@@ -10,7 +10,7 @@ from aiortc.contrib.media import MediaPlayer
 
 from ..base import PrinterProvider
 from ..registry import register
-from ...services.component_validator import get_component_type_from_entity, is_camera_entity, is_status_entity
+from ...services.component_validator import get_component_type_from_entity, is_camera_entity, is_status_entity, get_default_state_value
 
 logger = logging.getLogger(__name__)
 
@@ -82,9 +82,9 @@ class HomeAssistantProvider(PrinterProvider):
         self.pause_entity_id = pause_entity_id
         self.resume_entity_id = resume_entity_id
         self.stop_entity_id = stop_entity_id
-        self.printing_state = (printing_state or "printing").strip().lower()
-        self.paused_state = (paused_state or "paused").strip().lower()
-        self.error_state = (error_state or "error").strip().lower()
+        self.printing_state = (printing_state or get_default_state_value("printing_state")).strip().lower()
+        self.paused_state = (paused_state or get_default_state_value("paused_state")).strip().lower()
+        self.error_state = (error_state or get_default_state_value("error_state")).strip().lower()
         self.state_attribute = state_attribute
         self.headers = {
             "Authorization": f"Bearer {self.token}",
@@ -221,6 +221,7 @@ class HomeAssistantProvider(PrinterProvider):
                         headers={"Authorization": f"Bearer {token}"}
                     )
                     resp.raise_for_status()
+                    logger.info(f"HA entity details for {entity_id}: {resp.json()}")
                     return resp.json()
                 return await _retry_with_backoff(_get_details, max_retries=2)
         except (httpx.ReadTimeout, httpx.ConnectTimeout, httpx.TimeoutException) as e:
