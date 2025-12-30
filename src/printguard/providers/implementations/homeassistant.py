@@ -14,6 +14,54 @@ from ...services.component_validator import get_component_type_from_entity
 
 logger = logging.getLogger(__name__)
 
+
+async def _retry_with_backoff(
+    func,
+    max_retries: int = 3,
+    initial_delay: float = 1.0,
+    max_delay: float = 10.0,
+    backoff_factor: float = 2.0,
+    timeout_exceptions: tuple = (httpx.ReadTimeout, httpx.ConnectTimeout, httpx.TimeoutException)
+):
+    """
+    Retry a function with exponential backoff for timeout exceptions.
+    
+    Args:
+        func: Async function to retry
+        max_retries: Maximum number of retry attempts (default: 3)
+        initial_delay: Initial delay in seconds before first retry (default: 1.0)
+        max_delay: Maximum delay between retries in seconds (default: 10.0)
+        backoff_factor: Factor to multiply delay by after each retry (default: 2.0)
+        timeout_exceptions: Tuple of exception types to retry on (default: httpx timeout exceptions)
+    
+    Returns:
+        Result of the function call
+        
+    Raises:
+        Last exception if all retries are exhausted
+    """
+    delay = initial_delay
+    last_exception = None
+    
+    for attempt in range(max_retries + 1):
+        try:
+            return await func()
+        except timeout_exceptions as e:
+            last_exception = e
+            if attempt < max_retries:
+                logger.warning(
+                    f"Timeout exception (attempt {attempt + 1}/{max_retries + 1}): {type(e).__name__}. "
+                    f"Retrying in {delay:.2f}s..."
+                )
+                await asyncio.sleep(delay)
+                delay = min(delay * backoff_factor, max_delay)
+            else:
+                logger.error(f"All {max_retries + 1} attempts failed with timeout exception: {type(e).__name__}")
+        except Exception as e:
+            raise
+    if last_exception:
+        raise last_exception
+
 @register("homeassistant")
 class HomeAssistantProvider(PrinterProvider):
     """Provider for Home Assistant API."""
@@ -73,11 +121,17 @@ class HomeAssistantProvider(PrinterProvider):
             return False
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
-                resp = await client.get(
-                    f"{hass_url}/api/",
-                    headers={"Authorization": f"Bearer {token}"}
-                )
+                async def _validate():
+                    resp = await client.get(
+                        f"{hass_url}/api/",
+                        headers={"Authorization": f"Bearer {token}"}
+                    )
+                    return resp
+                resp = await _retry_with_backoff(_validate, max_retries=2)
                 return resp.status_code == 200 and "message" in resp.json() and resp.json()["message"] == "API running."
+        except (httpx.ReadTimeout, httpx.ConnectTimeout, httpx.TimeoutException) as e:
+            logger.error(f"HA validation failed after retries: {e}")
+            return False
         except Exception as e:
             logger.error(f"HA validation failed: {e}")
             return False
@@ -98,11 +152,17 @@ class HomeAssistantProvider(PrinterProvider):
 
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
-                resp = await client.get(
-                    f"{hass_url}/api/states/{entity_id}",
-                    headers={"Authorization": f"Bearer {token}"}
-                )
+                async def _validate_component():
+                    resp = await client.get(
+                        f"{hass_url}/api/states/{entity_id}",
+                        headers={"Authorization": f"Bearer {token}"}
+                    )
+                    return resp
+                resp = await _retry_with_backoff(_validate_component, max_retries=2)
                 return resp.status_code == 200
+        except (httpx.ReadTimeout, httpx.ConnectTimeout, httpx.TimeoutException) as e:
+            logger.error(f"HA component validation failed for {entity_id} after retries: {e}")
+            return False
         except Exception as e:
             logger.error(f"HA component validation failed for {entity_id}: {e}")
             return False
@@ -116,12 +176,14 @@ class HomeAssistantProvider(PrinterProvider):
             return []
         try:
             async with httpx.AsyncClient(timeout=15.0) as client:
-                resp = await client.get(
-                    f"{hass_url}/api/states",
-                    headers={"Authorization": f"Bearer {token}"}
-                )
-                resp.raise_for_status()
-                states = resp.json()
+                async def _list_entities():
+                    resp = await client.get(
+                        f"{hass_url}/api/states",
+                        headers={"Authorization": f"Bearer {token}"}
+                    )
+                    resp.raise_for_status()
+                    return resp.json()
+                states = await _retry_with_backoff(_list_entities, max_retries=2, initial_delay=2.0)
                 entities = []
                 for state in states:
                     entity_id = state["entity_id"]
@@ -137,6 +199,9 @@ class HomeAssistantProvider(PrinterProvider):
 
                         entities.append({"id": entity_id, "name": name, "type": comp_type})
                 return entities
+        except (httpx.ReadTimeout, httpx.ConnectTimeout, httpx.TimeoutException) as e:
+            logger.error(f"HA entity listing failed for {hass_url} after retries: {e}")
+            return []
         except Exception as e:
             logger.error(f"HA entity listing failed for {hass_url}: {e}")
             return []
@@ -150,12 +215,17 @@ class HomeAssistantProvider(PrinterProvider):
             return {}
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
-                resp = await client.get(
-                    f"{hass_url}/api/states/{entity_id}",
-                    headers={"Authorization": f"Bearer {token}"}
-                )
-                resp.raise_for_status()
-                return resp.json()
+                async def _get_details():
+                    resp = await client.get(
+                        f"{hass_url}/api/states/{entity_id}",
+                        headers={"Authorization": f"Bearer {token}"}
+                    )
+                    resp.raise_for_status()
+                    return resp.json()
+                return await _retry_with_backoff(_get_details, max_retries=2)
+        except (httpx.ReadTimeout, httpx.ConnectTimeout, httpx.TimeoutException) as e:
+            logger.error(f"HA entity detail fetch failed for {entity_id} at {hass_url} after retries: {e}")
+            return {}
         except Exception as e:
             logger.error(f"HA entity detail fetch failed for {entity_id} at {hass_url}: {e}")
             return {}
@@ -164,12 +234,20 @@ class HomeAssistantProvider(PrinterProvider):
         """Call a Home Assistant service."""
         if not self.client:
             await self.connect()
-        try:
+        
+        async def _make_service_call():
+            """Inner function to make service call for retry logic."""
             response = await self.client.post(
                 f"/api/services/{domain}/{service}",
                 json=service_data
             )
             response.raise_for_status()
+            return response
+        
+        try:
+            await _retry_with_backoff(_make_service_call)
+        except (httpx.ReadTimeout, httpx.ConnectTimeout, httpx.TimeoutException) as e:
+            logger.error(f"Failed to call HA service {domain}.{service} after retries: {e}")
         except Exception as e:
             logger.error(f"Failed to call HA service {domain}.{service}: {e}")
 
@@ -187,22 +265,44 @@ class HomeAssistantProvider(PrinterProvider):
     async def connect(self) -> None:
         """Initialize the HTTP client and test connection."""
         if not self.client:
-            self.client = httpx.AsyncClient(base_url=self.hass_url, headers=self.headers)
+            self.client = httpx.AsyncClient(
+                base_url=self.hass_url, 
+                headers=self.headers,
+                timeout=20.0
+            )
         logger.info(f"Testing connection to HA at {self.hass_url} for entity {self.entity_id}")
-        try:
+        
+        async def _test_connection():
+            """Inner function to test connection for retry logic."""
             response = await self.client.get(f"/api/states/{self.entity_id}")
             response.raise_for_status()
+            return response
+        
+        try:
+            response = await _retry_with_backoff(_test_connection)
             logger.info(f"Successfully connected to HA, entity {self.entity_id} state: {response.json().get('state')}")
             # Test camera snapshot proxy access (single JPEG)
             if self.entity_id.startswith("camera."):
                 proxy_url = f"/api/camera_proxy/{self.entity_id}"
                 logger.debug(f"Testing camera proxy access: {proxy_url}")
-                test_resp = await self.client.get(proxy_url, timeout=10.0)
-                if test_resp.status_code == 200:
-                    content_type = test_resp.headers.get("Content-Type", "unknown")
-                    logger.info(f"Camera proxy access verified. Content-Type: {content_type}")
-                else:
-                    logger.warning(f"Camera proxy access failed with status {test_resp.status_code}: {test_resp.text[:100]}")
+                
+                async def _test_camera():
+                    """Inner function to test camera access for retry logic."""
+                    test_resp = await self.client.get(proxy_url, timeout=10.0)
+                    return test_resp
+                
+                try:
+                    test_resp = await _retry_with_backoff(_test_camera, max_retries=2)
+                    if test_resp.status_code == 200:
+                        content_type = test_resp.headers.get("Content-Type", "unknown")
+                        logger.info(f"Camera proxy access verified. Content-Type: {content_type}")
+                    else:
+                        logger.warning(f"Camera proxy access failed with status {test_resp.status_code}: {test_resp.text[:100]}")
+                except (httpx.ReadTimeout, httpx.ConnectTimeout, httpx.TimeoutException) as e:
+                    logger.warning(f"Camera proxy access timeout (non-critical): {e}")
+        except (httpx.ReadTimeout, httpx.ConnectTimeout, httpx.TimeoutException) as e:
+            logger.error(f"HA connection test failed after retries: {e}")
+            raise
         except Exception as e:
             logger.error(f"HA connection test failed: {e}")
             raise
@@ -225,11 +325,16 @@ class HomeAssistantProvider(PrinterProvider):
         """Get the current status of the printer."""
         if not self.client:
             await self.connect()
-        try:
+        
+        async def _fetch_status():
+            """Inner function to fetch status for retry logic."""
             response = await self.client.get(f"/api/states/{self.entity_id}")
             response.raise_for_status()
-            data = response.json()
-
+            return response.json()
+        
+        try:
+            data = await _retry_with_backoff(_fetch_status)
+            
             if self.entity_id.startswith(("sensor.", "binary_sensor.")):
                 state = str(data.get("state", "")).lower()
             elif self.state_attribute:
@@ -244,6 +349,9 @@ class HomeAssistantProvider(PrinterProvider):
             if state == self.paused_state:
                 return "paused"
             return "idle"
+        except (httpx.ReadTimeout, httpx.ConnectTimeout, httpx.TimeoutException) as e:
+            logger.error(f"Failed to get status for {self.entity_id} after retries: {e}")
+            return "error"
         except Exception as e:
             logger.error(f"Failed to get status for {self.entity_id}: {e}")
             return "error"

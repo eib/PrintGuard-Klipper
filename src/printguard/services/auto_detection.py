@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Dict
+from typing import Dict, Optional
 
+import httpx
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..core.database import async_session
 from ..core.db_models import Printer, PrinterComponentLink
@@ -16,9 +18,27 @@ from .streams import stream_manager
 logger = logging.getLogger(__name__)
 
 
-async def _set_inference_paused(printer_id: str, paused: bool) -> None:
-    """Apply inference pause state to DB, cached instance, and active processor if present."""
-    async with async_session() as db:
+async def _set_inference_paused(printer_id: str, paused: bool, db: Optional[AsyncSession] = None) -> None:
+    """Apply inference pause state to DB, cached instance, and active processor if present.
+    
+    Args:
+        printer_id: ID of the printer
+        paused: Whether inference should be paused
+        db: Optional database session. If not provided, a new session will be created.
+    """
+    if db is None:
+        async with async_session() as session:
+            result = await session.execute(select(Printer).where(Printer.id == printer_id))
+            db_printer = result.scalar_one_or_none()
+            if not db_printer:
+                return
+            db_printer.inference_paused = paused
+            await session.commit()
+
+            instance = await _get_or_create_printer_instance(printer_id, session)
+            if instance:
+                instance.config.inference_paused = paused
+    else:
         result = await db.execute(select(Printer).where(Printer.id == printer_id))
         db_printer = result.scalar_one_or_none()
         if not db_printer:
@@ -63,6 +83,9 @@ async def auto_detection_monitor(poll_interval_s: float = 10.0) -> None:
                         if not instance or not instance.status:
                             continue
                         is_printing = await instance.status.is_printing()
+                    except (httpx.ReadTimeout, httpx.TimeoutException, httpx.ConnectTimeout):
+                        logger.warning("Auto-detection: timeout checking status for %s", pid)
+                        continue
                     except Exception:
                         logger.debug("Auto-detection: status check failed for %s", pid, exc_info=True)
                         continue
@@ -73,7 +96,7 @@ async def auto_detection_monitor(poll_interval_s: float = 10.0) -> None:
                         continue
 
                     if is_printing != prev:
-                        await _set_inference_paused(pid, paused=not is_printing)
+                        await _set_inference_paused(pid, paused=not is_printing, db=db)
                         last_is_printing[pid] = is_printing
 
                 for stale in set(last_is_printing.keys()) - set(printer_ids):

@@ -61,7 +61,11 @@ class OctoPrintProvider(PrinterProvider):
     async def connect(self) -> None:
         """Initialize the HTTP client and test connection."""
         if not self.client:
-            self.client = httpx.AsyncClient(base_url=self.host, headers=self.headers)
+            self.client = httpx.AsyncClient(
+                base_url=self.host, 
+                headers=self.headers,
+                timeout=20.0
+            )
         # Test connection by getting connection settings
         response = await self.client.get("/api/connection")
         response.raise_for_status()
