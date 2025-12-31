@@ -1,14 +1,13 @@
 from sqlalchemy.orm import DeclarativeBase
 from typing import Type
 from pydantic import BaseModel
-from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy import TypeDecorator
+from sqlalchemy import TypeDecorator, JSON
 
 class Base(DeclarativeBase):
     pass
 
 class PydanticType(TypeDecorator):
-    impl = JSONB
+    impl = JSON
     cache_ok = True
 
     def __init__(self, pydantic_model: Type[BaseModel], *args, **kwargs):

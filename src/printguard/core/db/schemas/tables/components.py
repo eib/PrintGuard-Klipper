@@ -1,11 +1,11 @@
 import uuid
-from sqlalchemy import Enum, ForeignKey
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy import Enum, ForeignKey, JSON
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 
 from ...base import Base
 from ...types import ComponentType
-from ...config import BaseConfig, CameraComponentConfig, ControlComponentConfig, StatusComponentConfig
+from ...config import BaseConfig
 from ....connections import (
     ConnectionCameraComponentConfigRoot,
     ConnectionStatusComponentConfigRoot,
@@ -18,7 +18,7 @@ class DeviceComponent(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     type: Mapped[ComponentType] = mapped_column(Enum(ComponentType), nullable=False)
     connection_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("connections.id"))
-    config: Mapped[BaseConfig] = mapped_column(JSONB)
+    config: Mapped[BaseConfig] = mapped_column(JSON)
     connection: Mapped["Connection"] = relationship()
 
     @validates("config")

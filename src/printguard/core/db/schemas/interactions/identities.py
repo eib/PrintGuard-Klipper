@@ -28,7 +28,7 @@ class IdentityRead(BaseModel):
 class UserCreate(BaseModel):
     username: str
     password: str
-    scopes: List[ScopeType] = [ScopeType.VIEWER]
+    scopes: List[ScopeType] = [ScopeType.USER]
 
 class ServiceAccountCreate(BaseModel):
-    scopes: List[ScopeType] = [ScopeType.SYSTEM]
+    scopes: List[ScopeType] = [ScopeType.USER]
