@@ -4,7 +4,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ...base import Base, PydanticType
-from ...configurations import ConnectionConfig, ConnectionConfigRoot
+from ....connections import ConnectionConfig, ConnectionConfigRoot
 
 
 class Connection(Base):

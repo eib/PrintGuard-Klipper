@@ -1,7 +1,7 @@
 import uuid
 from pydantic import BaseModel, ConfigDict
 
-from ...configurations import BaseConfig
+from ...config import BaseConfig
 from ...types import ComponentType
 from .connections import ConnectionRead
 
