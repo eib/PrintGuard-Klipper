@@ -6,24 +6,20 @@ import pickle
 import onnxruntime as ort
 from huggingface_hub import hf_hub_download
 
-REPO_ID = "oliverbravery/printguard"
-FILES = ["model.onnx", "opt.json", "prototypes.pkl"]
+from ..config import settings
 
 _model_info: dict | None = None
 
 
 def download_model(force: bool = False) -> None:
-    """Download model files from HuggingFace if not present."""
-    model_dir = "TODO"
-    model_dir.mkdir(parents=True, exist_ok=True)
-    for filename in FILES:
+    model_dir = settings.MODEL_DIR
+    for filename in settings.MODEL_FILES:
         filepath = model_dir / filename
         if force or not filepath.exists():
             hf_hub_download(
-                repo_id=REPO_ID,
+                repo_id=settings.MODEL_REPO_ID,
                 filename=filename,
-                local_dir=model_dir,
-                local_dir_use_symlinks=False
+                local_dir=model_dir
             )
 
 
