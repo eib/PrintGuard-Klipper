@@ -3,9 +3,8 @@ from sqlalchemy import Enum, ForeignKey, JSON
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 
-from ...base import Base
+from ...base import Base, BaseConfig
 from ...types import ComponentType
-from ...config import BaseConfig
 from ....connections import (
     ConnectionCameraComponentConfigRoot,
     ConnectionStatusComponentConfigRoot,

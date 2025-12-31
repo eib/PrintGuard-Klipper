@@ -1,7 +1,7 @@
 from typing import Literal
 from pydantic import BaseModel
 
-from ..db.config import BaseConfig
+from ..db.base import BaseConfig
 from ..db.types import ConnectionType
 
 class HomeAssistantConnectionConfig(BaseConfig):

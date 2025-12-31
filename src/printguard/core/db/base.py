@@ -6,6 +6,9 @@ from sqlalchemy import TypeDecorator, JSON
 class Base(DeclarativeBase):
     pass
 
+class BaseConfig(BaseModel):
+    type: str
+
 class PydanticType(TypeDecorator):
     impl = JSON
     cache_ok = True
