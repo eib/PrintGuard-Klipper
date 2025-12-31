@@ -5,7 +5,12 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 
 from ...base import Base
 from ...types import ComponentType
-from ...configurations import BaseConfig, CameraComponentConfig, ControlComponentConfig, StatusComponentConfig
+from ...config import BaseConfig, CameraComponentConfig, ControlComponentConfig, StatusComponentConfig
+from ....connections import (
+    ConnectionCameraComponentConfigRoot,
+    ConnectionStatusComponentConfigRoot,
+    ConnectionControlComponentConfigRoot
+)
 from .connections import Connection
 
 class DeviceComponent(Base):
@@ -18,15 +23,12 @@ class DeviceComponent(Base):
 
     @validates("config")
     def validate_config_type(self, key, value):
-        model_map = {
-            ComponentType.CAMERA: CameraComponentConfig,
-            ComponentType.CONTROL: ControlComponentConfig,
-            ComponentType.STATUS: StatusComponentConfig,
+        root_map = {
+            ComponentType.CAMERA: ConnectionCameraComponentConfigRoot,
+            ComponentType.CONTROL: ConnectionControlComponentConfigRoot,
+            ComponentType.STATUS: ConnectionStatusComponentConfigRoot,
         }
-        target_model = model_map.get(self.type)
-        if isinstance(value, dict) and target_model:
-            value["type"] = self.type.value
-            return target_model.model_validate(value)
-        if target_model and not isinstance(value, target_model):
-            raise ValueError(f"Config must be {target_model.__name__} for type {self.type}")
+        target_root = root_map.get(self.type)
+        if target_root:
+            return target_root.model_validate(value).model_dump()
         return value
