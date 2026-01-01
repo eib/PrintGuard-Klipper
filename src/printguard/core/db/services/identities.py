@@ -6,11 +6,15 @@ from sqlalchemy.orm import joinedload
 from ..schemas.tables.identities import Identity, User, IdentityScope
 from ..schemas.interactions.identities import UserCreate
 from ..types import IdentityType
+from ...state.manager import GlobalStateManager
+from ...state.models import WebSocketEvent, WebSocketEventUpdateType
 
 class IdentityService:
     """Manages the complex multi-table structure of Identities, Users, and Scopes."""
-    def __init__(self, session: AsyncSession):
+    def __init__(self, session: AsyncSession, state_manager: GlobalStateManager):
         self.session = session
+        self.state_manager = state_manager
+        self.websocket_event = WebSocketEvent.IDENTITY_UPDATE
 
     async def get_identity(self, identity_id: uuid.UUID) -> Optional[Identity]:
         result = await self.session.execute(
@@ -43,6 +47,7 @@ class IdentityService:
             self.session.add(scope)
 
         await self.session.commit()
+        await self.state_manager.send_update(WebSocketEventUpdateType.CREATE, self.websocket_event, str(identity.id))
         return await self.get_identity(identity.id)
 
     async def list_identities(self) -> List[Identity]:
