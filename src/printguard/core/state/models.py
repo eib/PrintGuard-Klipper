@@ -13,7 +13,7 @@ SafeDeque = Annotated[
 ]
 
 class WebSocketEvent(str, enum.Enum):
-    PRINTER_UPDATE = "PRINTER_UPDATE"
+    PRINTER_LIVE_STATE = "PRINTER_LIVE_STATE"
     INITIAL_SYNC = "INITIAL_SYNC"
 
 class InferenceClass(str, enum.Enum):

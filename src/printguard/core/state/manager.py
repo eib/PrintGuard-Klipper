@@ -30,7 +30,7 @@ class GlobalStateManager:
         self._states: Dict[uuid.UUID, PrinterLiveState] = {}
         self.ws_manager = ws_manager
 
-    async def update_printer(
+    async def update_printer_state(
         self, 
         printer_id: uuid.UUID, 
         status: Optional[PrintingState] = None, 
@@ -54,7 +54,7 @@ class GlobalStateManager:
             state.detection_history.append(inference_result)
 
         await self.ws_manager.broadcast({
-            "event": WebSocketEvent.PRINTER_UPDATE.value,
+            "event": WebSocketEvent.PRINTER_LIVE_STATE.value,
             "data": state.model_dump(mode="json")
         })
 
