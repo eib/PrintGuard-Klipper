@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     # --- SafeHTTPClient ---
     MAX_RETRIES: int = 3
     INITIAL_DELAY: float = 0.5
+    DEFAULT_TIMEOUT: float = 10.0
 
     # --- Detection ---
     MAX_DETECTON_HISTORY: int = 100

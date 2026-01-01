@@ -3,6 +3,8 @@ import asyncio
 import httpx
 from pydantic import BaseModel, HttpUrl, Field
 from typing import Any, Dict, Optional
+import enum
+
 from .config import settings
 
 class ClientConfig(BaseModel):
@@ -10,14 +12,21 @@ class ClientConfig(BaseModel):
     max_retries: int = Field(default=3, ge=0)
     initial_delay: float = Field(default=0.5, gt=0)
 
+class HTTPMethod(str, enum.Enum):
+    GET = "GET"
+    POST = "POST"
+    PUT = "PUT"
+    DELETE = "DELETE"
+    PATCH = "PATCH"
+
 class RequestParams(BaseModel):
     """Input model for the HTTP request."""
     url: HttpUrl
-    method: str = "GET"
+    method: HTTPMethod = HTTPMethod.GET
     headers: Optional[Dict[str, str]] = None
     params: Optional[Dict[str, Any]] = None
     json_data: Optional[Dict[str, Any]] = None
-    timeout: float = 10.0
+    timeout: float = settings.DEFAULT_TIMEOUT
 
 class ResponseData(BaseModel):
     """Output model for the HTTP response."""
@@ -40,7 +49,7 @@ class SafeHttpClient:
             for attempt in range(self.max_retries + 1):
                 try:
                     resp = client.request(
-                        method=params.method,
+                        method=params.method.value,
                         url=str(params.url),
                         headers=params.headers,
                         params=params.params,
@@ -61,7 +70,7 @@ class SafeHttpClient:
             for attempt in range(self.max_retries + 1):
                 try:
                     resp = await client.request(
-                        method=params.method,
+                        method=params.method.value,
                         url=str(params.url),
                         headers=params.headers,
                         params=params.params,
