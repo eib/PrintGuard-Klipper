@@ -4,11 +4,14 @@ from httpx import RequestError
 from pydantic import BaseModel
 
 from ..db.base import BaseConfig
-from ..db.types import ConnectionType
+from ..db.types import ConnectionType, ComponentType
 from ..db.schemas.tables.components import DeviceComponent
-from ..db.types import ComponentType
 from .base import BaseConnection
 from ..networking import http_client, RequestParams, HTTPMethod, ResponseData
+
+CAMERA_DOMAIN = "camera."
+STATUS_DOMAIN = ("sensor.", "binary_sensor.")
+CONTROL_DOMAIN = ("switch.", "light.", "button.", "input_button.", "lock.", "fan.", "cover.", "climate.")
 
 class HomeAssistantConnectionConfig(BaseConfig):
     provider: Literal[ConnectionType.HOMEASSISTANT] = ConnectionType.HOMEASSISTANT
@@ -25,6 +28,7 @@ class StatusComponentConfig(HABaseComponentConfig):
     entity_id: str
     is_printing_attr: str
     is_idle_attr: str
+    attributes: List[str]
 
 class ControlComponentConfig(HABaseComponentConfig):
     entity_id: str
@@ -43,52 +47,115 @@ class HAEntityState(BaseModel):
     context: HAContext
 
 class HomeAssistantConnection(BaseConnection):
-
     _connection_config: HomeAssistantConnectionConfig
     headers: dict
 
     def __init__(self, config: HomeAssistantConnectionConfig):
         self._connection_config = config
-        self.headers = {"Authorization": f"Bearer {self._connection_config.api_key}"}
+        self.headers = {
+            "Authorization": f"Bearer {self._connection_config.api_key}",
+            "Content-Type": "application/json"
+        }
 
     async def is_healthy(self) -> bool:
-        response: ResponseData = await http_client.run_async(
-            params=RequestParams(
-                url=f"{self._connection_config.url}/api/",
-                method=HTTPMethod.GET,
-                headers=self.headers,
-                params=None,
-                json_data=None
+        """Check if the HA API is running and the token is valid."""
+        try:
+            response: ResponseData = await http_client.run_async(
+                params=RequestParams(
+                    url=f"{self._connection_config.url}/api/",
+                    method=HTTPMethod.GET,
+                    headers=self.headers
+                )
             )
-        )
-        return response.content.get("message") == "API running." and response.is_success and response.status_code == 200
+            return response.is_success and response.content.get("message") == "API running."
+        except Exception:
+            return False
 
-    async def _get_entities(self) -> List[DeviceComponent]:
+    async def _get_raw_states(self) -> List[HAEntityState]:
+        """Fetch all entity states from the HA instance."""
         response: ResponseData = await http_client.run_async(
             params=RequestParams(
                 url=f"{self._connection_config.url}/api/states",
                 method=HTTPMethod.GET,
-                headers=self.headers,
-                params=None,
-                json_data=None
+                headers=self.headers
             )
         )
         if response.is_success and response.status_code == 200:
             return [HAEntityState(**entity) for entity in response.content]
         else:
-            raise RequestError(f"Failed to get entities. Status code: {response.status_code}, Content: {response.content}")
+            raise RequestError(f"Failed to get entities. Status: {response.status_code}")
 
-    async def _get_entity(self, entity_id: str) -> HAEntityState:
+    async def get_camera_entities(self, camera_ids: Optional[List[str]] = None) -> List[DeviceComponent]:
+        """Identifies cameras by their domain prefix."""
+        states = await self._get_raw_states()
+        cameras = [s for s in states if s.entity_id.startswith(CAMERA_DOMAIN)]
+        if camera_ids:
+            cameras = [c for c in cameras if c.entity_id in camera_ids]
+        return [
+            DeviceComponent(
+                type=ComponentType.CAMERA,
+                config=CameraComponentConfig(entity_id=c.entity_id).model_dump()
+            ) for c in cameras
+        ]
+
+    async def get_status_entities(self, status_ids: Optional[List[str]] = None) -> List[DeviceComponent]:
+        """Identifies statuses by their domain prefix."""
+        states = await self._get_raw_states()
+        statuses = [s for s in states if s.entity_id.startswith(STATUS_DOMAIN)]
+        if status_ids:
+            statuses = [s for s in statuses if s.entity_id in status_ids]
+        return [
+            DeviceComponent(
+                type=ComponentType.STATUS,
+                config=StatusComponentConfig(
+                    entity_id=s.entity_id,
+                    is_printing_attr="state",
+                    is_idle_attr="state",
+                    attributes=list(s.attributes.keys())
+                ).model_dump()
+            ) for s in statuses
+        ]
+
+    async def get_control_entities(self, control_ids: Optional[List[str]] = None) -> List[DeviceComponent]:
+        """Identifies controls by their domain prefix."""
+        states = await self._get_raw_states()
+        controls = [s for s in states if s.entity_id.startswith(CONTROL_DOMAIN)]
+        if control_ids:
+            controls = [c for c in controls if c.entity_id in control_ids]
+        return [
+            DeviceComponent(
+                type=ComponentType.CONTROL,
+                config=ControlComponentConfig(entity_id=c.entity_id).model_dump()
+            ) for c in controls
+        ]
+
+    async def trigger_control(self, control_id: str) -> bool:
+        """Triggers the appropriate service based on entity domain."""
+        domain = control_id.split(".")[0]
+        service_map = {
+            "button": "press",
+            "input_button": "press",
+            "lock": "toggle",
+            "light": "toggle",
+            "switch": "toggle",
+            "fan": "toggle",
+            "cover": "toggle"
+        }
+        service = service_map.get(domain, "toggle")
         response: ResponseData = await http_client.run_async(
             params=RequestParams(
-                url=f"{self._connection_config.url}/api/states/{entity_id}",
-                method=HTTPMethod.GET,
+                url=f"{self._connection_config.url}/api/services/{domain}/{service}",
+                method=HTTPMethod.POST,
                 headers=self.headers,
-                params=None,
-                json_data=None
+                json_data={"entity_id": control_id}
             )
         )
-        if response.is_success and response.status_code == 200:
-            return HAEntityState(**response.content)
-        else:
-            raise RequestError(f"Failed to get entity. Status code: {response.status_code}, Content: {response.content}")
+        return response.is_success and response.status_code == 200
+
+    async def get_status_states(self, status_ids: Optional[List[str]] = None) -> List[str]:
+        """Retrieves the current state strings for the specified IDs."""
+        states = await self._get_raw_states()
+        if status_ids:
+            state_map = {s.entity_id: s.state for s in states}
+            return [state_map.get(sid, "unknown") for sid in status_ids]
+        return [s.state for s in states if s.entity_id.startswith(STATUS_DOMAIN)]
