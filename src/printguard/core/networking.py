@@ -3,6 +3,7 @@ import asyncio
 import httpx
 from pydantic import BaseModel, HttpUrl, Field
 from typing import Any, Dict, Optional
+from .config import settings
 
 class ClientConfig(BaseModel):
     """Configuration model for the client initialization."""
@@ -74,3 +75,5 @@ class SafeHttpClient:
                     if attempt == self.max_retries:
                         return ResponseData(status_code=None, content={"error": str(e)}, is_success=False)
                     await asyncio.sleep(self._get_delay(attempt))
+
+http_client = SafeHttpClient(ClientConfig(max_retries=settings.MAX_RETRIES, initial_delay=settings.INITIAL_DELAY))
