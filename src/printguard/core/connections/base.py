@@ -1,12 +1,15 @@
 from typing import Any, List, Optional
 
 from ..db.schemas.tables.components import DeviceComponent
+from ..db.base import BaseConfig
 
 class BaseConnection:
     """Base class for all connections."""
+
+    _connection_config: BaseConfig
     
-    def __init__(self):
-        ...
+    def __init__(self, config: BaseConfig):
+        self._connection_config = config
 
     async def is_healthy(self) -> bool:
         """Check if the connection is healthy."""
