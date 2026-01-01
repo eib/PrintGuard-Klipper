@@ -30,3 +30,9 @@ class BaseConnection:
         Returns a list of DeviceComponent objects with the connection's specific config.
         """
         raise NotImplementedError("The 'get_controls' connection function has not been implemented.")
+
+    async def trigger_control(self, control_id: str) -> bool:
+        """Trigger the control with the given id.
+        Returns True if the control was triggered successfully, False otherwise.
+        """
+        raise NotImplementedError("The 'trigger_control' connection function has not been implemented.")
