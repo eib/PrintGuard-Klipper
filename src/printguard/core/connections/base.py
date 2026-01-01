@@ -1,4 +1,6 @@
+import uuid
 from typing import Any, List, Optional
+from ..db.services.components import ComponentService
 
 from ..db.schemas.tables.components import DeviceComponent
 from ..db.base import BaseConfig
@@ -7,9 +9,13 @@ class BaseConnection:
     """Base class for all connections."""
 
     _connection_config: BaseConfig
+    connection_id: Optional[uuid.UUID]
+    component_service: Optional[ComponentService]
     
-    def __init__(self, config: BaseConfig):
+    def __init__(self, config: BaseConfig, connection_id: Optional[uuid.UUID] = None, component_service: Optional[ComponentService] = None):
         self._connection_config = config
+        self.connection_id = connection_id
+        self.component_service = component_service
 
     async def is_healthy(self) -> bool:
         """Check if the connection is healthy."""

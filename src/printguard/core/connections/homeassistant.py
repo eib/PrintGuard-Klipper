@@ -1,11 +1,14 @@
 from typing import Literal, Optional, List, Dict, Any
+import uuid
 from datetime import datetime
 from httpx import RequestError
 from pydantic import BaseModel
+from sqlalchemy import select
 
 from ..db.base import BaseConfig
 from ..db.types import ConnectionType, ComponentType
 from ..db.schemas.tables.components import DeviceComponent
+from ..db.services.components import ComponentService
 from .base import BaseConnection
 from ..networking import http_client, RequestParams, HTTPMethod, ResponseData
 
@@ -50,13 +53,6 @@ class HomeAssistantConnection(BaseConnection):
     _connection_config: HomeAssistantConnectionConfig
     headers: dict
 
-    def __init__(self, config: HomeAssistantConnectionConfig):
-        self._connection_config = config
-        self.headers = {
-            "Authorization": f"Bearer {self._connection_config.api_key}",
-            "Content-Type": "application/json"
-        }
-
     async def is_healthy(self) -> bool:
         """Check if the HA API is running and the token is valid."""
         try:
@@ -70,6 +66,13 @@ class HomeAssistantConnection(BaseConnection):
             return response.is_success and response.content.get("message") == "API running."
         except Exception:
             return False
+
+    def __init__(self, config: HomeAssistantConnectionConfig, connection_id: Optional[uuid.UUID] = None, component_service: Optional[ComponentService] = None):
+        super().__init__(config, connection_id, component_service)
+        self.headers = {
+            "Authorization": f"Bearer {self._connection_config.api_key}",
+            "Content-Type": "application/json"
+        }
 
     async def _get_raw_states(self) -> List[HAEntityState]:
         """Fetch all entity states from the HA instance."""
@@ -91,12 +94,26 @@ class HomeAssistantConnection(BaseConnection):
         cameras = [s for s in states if s.entity_id.startswith(CAMERA_DOMAIN)]
         if camera_ids:
             cameras = [c for c in cameras if c.entity_id in camera_ids]
-        return [
+        components = [
             DeviceComponent(
                 type=ComponentType.CAMERA,
                 config=CameraComponentConfig(entity_id=c.entity_id).model_dump()
             ) for c in cameras
         ]
+        if self.component_service and self.connection_id:
+            db_components = await self.component_service.get_by_connection(
+                self.connection_id, 
+                ComponentType.CAMERA
+            )
+            
+            existing_map = {c.config.get("entity_id"): c.id for c in db_components}
+            
+            for component in components:
+                entity_id = component.config.get("entity_id")
+                if entity_id in existing_map:
+                    component.id = existing_map[entity_id]
+                    
+        return components
 
     async def get_status_entities(self, status_ids: Optional[List[str]] = None) -> List[DeviceComponent]:
         """Identifies statuses by their domain prefix."""
@@ -104,7 +121,8 @@ class HomeAssistantConnection(BaseConnection):
         statuses = [s for s in states if s.entity_id.startswith(STATUS_DOMAIN)]
         if status_ids:
             statuses = [s for s in statuses if s.entity_id in status_ids]
-        return [
+            
+        components = [
             DeviceComponent(
                 type=ComponentType.STATUS,
                 config=StatusComponentConfig(
@@ -116,18 +134,49 @@ class HomeAssistantConnection(BaseConnection):
             ) for s in statuses
         ]
 
+        if self.component_service and self.connection_id:
+            db_components = await self.component_service.get_by_connection(
+                self.connection_id,
+                ComponentType.STATUS
+            )
+
+            existing_map = {c.config.get("entity_id"): c.id for c in db_components}
+
+            for component in components:
+                entity_id = component.config.get("entity_id")
+                if entity_id in existing_map:
+                    component.id = existing_map[entity_id]
+
+        return components
+
     async def get_control_entities(self, control_ids: Optional[List[str]] = None) -> List[DeviceComponent]:
         """Identifies controls by their domain prefix."""
         states = await self._get_raw_states()
         controls = [s for s in states if s.entity_id.startswith(CONTROL_DOMAIN)]
         if control_ids:
             controls = [c for c in controls if c.entity_id in control_ids]
-        return [
+            
+        components = [
             DeviceComponent(
                 type=ComponentType.CONTROL,
                 config=ControlComponentConfig(entity_id=c.entity_id).model_dump()
             ) for c in controls
         ]
+
+        if self.component_service and self.connection_id:
+            db_components = await self.component_service.get_by_connection(
+                self.connection_id,
+                ComponentType.CONTROL
+            )
+
+            existing_map = {c.config.get("entity_id"): c.id for c in db_components}
+
+            for component in components:
+                entity_id = component.config.get("entity_id")
+                if entity_id in existing_map:
+                    component.id = existing_map[entity_id]
+
+        return components
 
     async def trigger_control(self, control_id: str) -> bool:
         """Triggers the appropriate service based on entity domain."""
