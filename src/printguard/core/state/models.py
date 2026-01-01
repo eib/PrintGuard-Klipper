@@ -14,6 +14,7 @@ SafeDeque = Annotated[
 
 class WebSocketEvent(str, enum.Enum):
     PRINTER_LIVE_STATE = "PRINTER_LIVE_STATE"
+    CONNECTION_LIVE_STATE = "CONNECTION_LIVE_STATE"
     INITIAL_SYNC = "INITIAL_SYNC"
 
 class InferenceClass(str, enum.Enum):
@@ -30,6 +31,11 @@ class InferenceResult(BaseModel):
     class_name: InferenceClass
     confidence: float
     timestamp: datetime = Field(default_factory=datetime.now)
+
+class ConnectionProviderLiveState(BaseModel):
+    connection_id: uuid.UUID
+    is_healthy: bool = False
+    last_activity: datetime = Field(default_factory=datetime.now)
 
 class PrinterLiveState(BaseModel):
     printer_id: uuid.UUID
