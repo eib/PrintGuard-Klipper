@@ -1,29 +1,6 @@
-import uuid
-from datetime import datetime
 from typing import List, Optional
-from pydantic import BaseModel, ConfigDict
-from ...types import IdentityType, ScopeType
-
-class ScopeRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-    scope: ScopeType
-
-class UserRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-    username: str
-
-class ServiceAccountRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-    client_id: uuid.UUID
-
-class IdentityRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-    id: uuid.UUID
-    type: IdentityType
-    created_at: datetime
-    scopes: List[ScopeRead]
-    user: Optional[UserRead] = None
-    service_account: Optional[ServiceAccountRead] = None
+from pydantic import BaseModel
+from ...types import ScopeType
 
 class UserCreate(BaseModel):
     username: str
@@ -31,4 +8,14 @@ class UserCreate(BaseModel):
     scopes: List[ScopeType] = [ScopeType.USER]
 
 class ServiceAccountCreate(BaseModel):
+    client_secret: str
     scopes: List[ScopeType] = [ScopeType.USER]
+
+class IdentityUpdate(BaseModel):
+    # User-specific fields
+    username: Optional[str] = None
+    password: Optional[str] = None
+    # M2M-specific fields
+    client_secret: Optional[str] = None
+    # Shared fields
+    scopes: Optional[List[ScopeType]] = None
