@@ -5,6 +5,8 @@ from contextlib import asynccontextmanager
 
 from .api.routes import router
 from .core.db.session import init_db
+from .core.config import settings
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -13,9 +15,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="PrintGuard API",
-    description="Print defect detection API",
-    version="1.0.0",
+    title=settings.APP_NAME,
+    version=settings.APP_VERSION,
     lifespan=lifespan,
 )
 

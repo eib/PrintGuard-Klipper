@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     MEDIAMTX_API_URL: str = "http://localhost:9997/v3"
     MEDIAMTX_WEBRTC_URL: str = "http://localhost:8889"
 
+    # --- Detection ---
+    MAX_DETECTON_HISTORY: int = 100
+
     # --- Pydantic Configuration ---
     model_config = SettingsConfigDict(
         env_file=".env", 
