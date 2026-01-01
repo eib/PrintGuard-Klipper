@@ -13,9 +13,21 @@ SafeDeque = Annotated[
 ]
 
 class WebSocketEvent(str, enum.Enum):
+    # High-Frequency
     PRINTER_LIVE_STATE = "PRINTER_LIVE_STATE"
     CONNECTION_LIVE_STATE = "CONNECTION_LIVE_STATE"
+    # Low-Frequency
+    PRINTER_UPDATE = "PRINTER_UPDATE"
+    COMPONENT_UPDATE = "COMPONENT_UPDATE"
+    CONNECTION_UPDATE = "CONNECTION_UPDATE"
+    IDENTITY_UPDATE = "USER_UPDATE"
+    # Inital Sync
     INITIAL_SYNC = "INITIAL_SYNC"
+
+class WebSocketEventUpdateType(str, enum.Enum):
+    UPDATE = "UPDATE"
+    DELETE = "DELETE"
+    CREATE = "CREATE"
 
 class InferenceClass(str, enum.Enum):
     SUCCESS = "success"

@@ -1,7 +1,7 @@
 from fastapi import WebSocket
 from typing import Dict, List, Optional
 import uuid
-from .models import PrinterLiveState, InferenceResult, PrintingState, WebSocketEvent, ConnectionProviderLiveState
+from .models import PrinterLiveState, InferenceResult, PrintingState, WebSocketEvent, ConnectionProviderLiveState, WebSocketEventUpdateType
 
 class ConnectionManager:
     """Manages active WebSocket subscribers and broadcasting."""
@@ -69,6 +69,15 @@ class GlobalStateManager:
         await self.ws_manager.broadcast({
             "event": WebSocketEvent.CONNECTION_LIVE_STATE.value,
             "data": state.model_dump(mode="json")
+        })
+
+    async def send_update(self, update_type: WebSocketEventUpdateType, event: WebSocketEvent, record_id: str):
+        await self.ws_manager.broadcast({
+            "event": event.value,
+            "data": {
+                "type": update_type.value,
+                "record_id": record_id
+            }
         })
 
     def get_all_json(self) -> Dict:
