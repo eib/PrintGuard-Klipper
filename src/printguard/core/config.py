@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     MODEL_FILES: List[str] = ["model.onnx", "opt.json", "prototypes.pkl"]
     MODEL_DIR: Path = PROJECT_ROOT / "models"
 
+    # --- MediaMTX ---
+    MEDIAMTX_API_URL: str = "http://localhost:9997/v3"
+    MEDIAMTX_WEBRTC_URL: str = "http://localhost:8889"
+
     # --- Pydantic Configuration ---
     model_config = SettingsConfigDict(
         env_file=".env", 
