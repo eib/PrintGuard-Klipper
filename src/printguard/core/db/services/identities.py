@@ -1,7 +1,7 @@
 import uuid
 from typing import List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, delete
 from sqlalchemy.orm import joinedload
 from ..schemas.tables.identities import Identity, User, IdentityScope
 from ..schemas.interactions.identities import UserCreate
@@ -49,6 +49,12 @@ class IdentityService:
         await self.session.commit()
         await self.state_manager.send_update(WebSocketEventUpdateType.CREATE, self.websocket_event, str(identity.id))
         return await self.get_identity(identity.id)
+    
+    async def delete_identity(self, identity_id: uuid.UUID) -> bool:
+        await self.session.execute(delete(Identity).where(Identity.id == identity_id))
+        await self.session.commit()
+        await self.state_manager.send_update(WebSocketEventUpdateType.DELETE, self.websocket_event, str(identity_id))
+        return True
 
     async def list_identities(self) -> List[Identity]:
         result = await self.session.execute(
