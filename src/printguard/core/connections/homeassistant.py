@@ -132,9 +132,9 @@ class HomeAssistantConnection(BaseConnection):
                 type=ComponentType.STATUS,
                 config=StatusComponentConfig(
                     entity_id=s.entity_id,
-                    is_printing_attr="state",
-                    is_idle_attr="state",
-                    attributes=list(s.attributes.keys())
+                    is_printing_attr="",
+                    is_idle_attr="",
+                    attributes=[s.state] + list(s.attributes.keys())
                 ).model_dump()
             ) for s in statuses
         ]
@@ -215,16 +215,8 @@ class HomeAssistantConnection(BaseConnection):
             raise ValueError(f"No access_token found for camera {entity_id}")
         return f"{self._connection_config.url}/api/camera_proxy_stream/{entity_id}?token={access_token}"
 
-    def map_status_state(self, state_str: str) -> PrintingState:
-        """Map Home Assistant state string to PrintingState."""
-        from ..state.models import PrintingState
-        state_lower = state_str.lower() if state_str else ""
-        if "printing" in state_lower:
+    def map_status_state(self, state_str: str, config: Optional[StatusComponentConfig] = None) -> PrintingState:
+        """Map Home Assistant state string to PrintingState using component config."""
+        if config and config.is_printing_attr and state_str == config.is_printing_attr:
             return PrintingState.PRINTING
-        elif "paused" in state_lower:
-            return PrintingState.PAUSED
-        elif "idle" in state_lower or "standby" in state_lower or "operational" in state_lower:
-            return PrintingState.IDLE
-        elif "offline" in state_lower or "unavailable" in state_lower:
-            return PrintingState.OFFLINE
-        return PrintingState.OFFLINE
+        return PrintingState.IDLE
