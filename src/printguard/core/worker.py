@@ -96,7 +96,7 @@ class WorkerOrchestrator:
                             status_ids = [p.status_component.entity_id for p in printer_list]
                             states = await connection.get_status_states(status_ids)
                             for printer, state_str in zip(printer_list, states):
-                                status = connection.map_status_state(state_str)
+                                status = connection.map_status_state(state_str, printer.status_component.config)
                                 await state_manager.update_printer_state(printer.id, status=status)
                         except Exception as e:
                             logger.error(f"Status poll failed for connection {conn_id}: {e}")
