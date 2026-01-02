@@ -189,3 +189,27 @@ class HomeAssistantConnection(BaseConnection):
             state_map = {s.entity_id: s.state for s in states}
             return [state_map.get(sid, "unknown") for sid in status_ids]
         return [s.state for s in states if s.entity_id.startswith(STATUS_DOMAIN)]
+
+    async def get_stream_url(self, component: "DeviceComponent") -> str:
+        """Get the MJPEG proxy stream URL for a camera entity.
+        
+        Returns the authenticated MJPEG proxy URL using the camera's access_token
+        from entity state attributes. This URL can be ingested by MediaMTX.
+        """
+        entity_id = component.config.get("entity_id")
+        if not entity_id:
+            raise ValueError("Component config missing entity_id")
+        state_response: ResponseData = await http_client.run_async(
+            params=RequestParams(
+                url=f"{self._connection_config.url}/api/states/{entity_id}",
+                method=HTTPMethod.GET,
+                headers=self.headers
+            )
+        )
+        if not state_response.is_success:
+            raise ValueError(f"Could not fetch state for {entity_id}")
+        attributes = state_response.content.get("attributes", {})
+        access_token = attributes.get("access_token")
+        if not access_token:
+            raise ValueError(f"No access_token found for camera {entity_id}")
+        return f"{self._connection_config.url}/api/camera_proxy_stream/{entity_id}?token={access_token}"
