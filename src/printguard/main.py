@@ -5,9 +5,11 @@ from contextlib import asynccontextmanager
 import asyncio
 
 from .api.routes import router
-from .core.db.session import init_db
+from .core.db.session import init_db, get_session_ctx
 from .core.config import settings
 from .core.redis_client import init_redis, close_redis, redis_subscriber
+from .core.ml.model import download_model, load_model
+from .core.worker import worker_orchestrator
 
 
 @asynccontextmanager
@@ -22,20 +24,26 @@ async def lifespan(app: FastAPI):
     # Initialize Database
     await init_db()
 
+    # Download and load ML model
+    download_model()
+    load_model()
+
     # Sync cameras on startup
-    from .core.db.session import AsyncSessionLocal, ServiceManager
-    from .core.state.manager import state_manager
     from .core.stream_manager import StreamManager
-    async with AsyncSessionLocal() as session:
-        service_manager = ServiceManager(session, state_manager)
-        stream_manager = StreamManager(service_manager)
+    async with get_session_ctx() as services:
+        stream_manager = StreamManager(services)
         try:
             await stream_manager.sync_cameras()
         except Exception as e:
             print(f"Failed to sync cameras on startup: {e}")
+
+    # Start background workers
+    await worker_orchestrator.start()
+
     yield
     
     # Cleanup
+    await worker_orchestrator.stop()
     subscriber_task.cancel()
     try:
         await subscriber_task
