@@ -52,3 +52,7 @@ class BaseConnection:
         Returns a list of status states.
         """
         raise NotImplementedError("The 'get_status_states' connection function has not been implemented.")
+
+    async def get_stream_url(self, component: "DeviceComponent") -> str:
+        """Get the RTSP stream URL for a camera component."""
+        raise NotImplementedError("The 'get_stream_url' connection function has not been implemented.")
