@@ -5,6 +5,7 @@ if TYPE_CHECKING:
     from ..db.session import ServiceManager
     from ..db.schemas.tables.components import DeviceComponent
 from ..db.base import BaseConfig
+from ..state.models import PrintingState
 
 class BaseConnection:
     """Base class for all connections."""
@@ -56,3 +57,16 @@ class BaseConnection:
     async def get_stream_url(self, component: "DeviceComponent") -> str:
         """Get the RTSP stream URL for a camera component."""
         raise NotImplementedError("The 'get_stream_url' connection function has not been implemented.")
+
+    def map_status_state(self, state_str: str) -> PrintingState:
+        """Map a raw state string from the connection to a PrintingState enum.
+        Override in subclasses for connection-specific mapping logic.
+        """
+        state_lower = state_str.lower() if state_str else ""
+        if "printing" in state_lower:
+            return PrintingState.PRINTING
+        elif "paused" in state_lower:
+            return PrintingState.PAUSED
+        elif "idle" in state_lower or "standby" in state_lower:
+            return PrintingState.IDLE
+        return PrintingState.OFFLINE
