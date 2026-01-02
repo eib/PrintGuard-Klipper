@@ -10,6 +10,7 @@ if TYPE_CHECKING:
 
 from ..db.base import BaseConfig
 from ..db.types import ConnectionType, ComponentType
+from ..state.models import PrintingState
 
 from .base import BaseConnection
 from ..networking import http_client, RequestParams, HTTPMethod, ResponseData
@@ -213,3 +214,17 @@ class HomeAssistantConnection(BaseConnection):
         if not access_token:
             raise ValueError(f"No access_token found for camera {entity_id}")
         return f"{self._connection_config.url}/api/camera_proxy_stream/{entity_id}?token={access_token}"
+
+    def map_status_state(self, state_str: str) -> PrintingState:
+        """Map Home Assistant state string to PrintingState."""
+        from ..state.models import PrintingState
+        state_lower = state_str.lower() if state_str else ""
+        if "printing" in state_lower:
+            return PrintingState.PRINTING
+        elif "paused" in state_lower:
+            return PrintingState.PAUSED
+        elif "idle" in state_lower or "standby" in state_lower or "operational" in state_lower:
+            return PrintingState.IDLE
+        elif "offline" in state_lower or "unavailable" in state_lower:
+            return PrintingState.OFFLINE
+        return PrintingState.OFFLINE
