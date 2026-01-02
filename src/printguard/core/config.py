@@ -33,6 +33,11 @@ class Settings(BaseSettings):
     # --- Detection ---
     MAX_DETECTON_HISTORY: int = 100
 
+    # --- Redis ---
+    REDIS_URL: str = "redis://localhost:6379"
+    REDIS_DB: int = 0
+    REDIS_CHANNEL: str = "printguard:events"
+
     # --- Pydantic Configuration ---
     model_config = SettingsConfigDict(
         env_file=".env", 
