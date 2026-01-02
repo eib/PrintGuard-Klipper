@@ -1,25 +1,29 @@
 from typing import Annotated, Union
 from pydantic import Field, RootModel
 
-from .homeassistant import HomeAssistantConnectionConfig, CameraComponentConfig, StatusComponentConfig, ControlComponentConfig
+from .homeassistant import (HomeAssistantConnectionConfig as HAConnectionConfig, 
+                            CameraComponentConfig as HACameraComponentConfig, 
+                            StatusComponentConfig as HAStatusComponentConfig, 
+                            ControlComponentConfig as HAControlComponentConfig)
+
 
 ConnectionConfig = Annotated[
-    Union[HomeAssistantConnectionConfig, ],
+    Union[HAConnectionConfig, ],
     Field(discriminator="provider")
 ]
 
 ConnectionCameraComponentConfig = Annotated[
-    Union[CameraComponentConfig, ],
+    Union[HACameraComponentConfig, ],
     Field(discriminator="provider")
 ]
 
 ConnectionStatusComponentConfig = Annotated[
-    Union[StatusComponentConfig, ],
+    Union[HAStatusComponentConfig, ],
     Field(discriminator="provider")
 ]
 
 ConnectionControlComponentConfig = Annotated[
-    Union[ControlComponentConfig, ],
+    Union[HAControlComponentConfig, ],
     Field(discriminator="provider")
 ]
 
