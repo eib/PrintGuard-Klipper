@@ -1,14 +1,16 @@
-from typing import Literal, Optional, List, Dict, Any
+from typing import Literal, Optional, List, Dict, Any, TYPE_CHECKING
 import uuid
 from datetime import datetime
 from httpx import RequestError
 from pydantic import BaseModel
-from sqlalchemy import select
+
+if TYPE_CHECKING:
+    from ..db.session import ServiceManager
+    from ..db.schemas.tables.components import DeviceComponent
 
 from ..db.base import BaseConfig
 from ..db.types import ConnectionType, ComponentType
-from ..db.schemas.tables.components import DeviceComponent
-from ..db.services.components import ComponentService
+
 from .base import BaseConnection
 from ..networking import http_client, RequestParams, HTTPMethod, ResponseData
 
@@ -67,12 +69,24 @@ class HomeAssistantConnection(BaseConnection):
         except Exception:
             return False
 
-    def __init__(self, config: HomeAssistantConnectionConfig, connection_id: Optional[uuid.UUID] = None, component_service: Optional[ComponentService] = None):
-        super().__init__(config, connection_id, component_service)
+    def __init__(self, config: HomeAssistantConnectionConfig, connection_id: Optional[uuid.UUID] = None, service_manager: Optional["ServiceManager"] = None):
+        super().__init__(config, connection_id, service_manager)
         self.headers = {
             "Authorization": f"Bearer {self._connection_config.api_key}",
             "Content-Type": "application/json"
         }
+
+    async def _link_entities_to_db(self, components: List["DeviceComponent"], component_type: ComponentType):
+        if self.service_manager and self.connection_id:
+            db_components = await self.service_manager.components.get_by_connection(
+                self.connection_id,
+                component_type
+            )
+            existing_map = {c.config.get("entity_id"): c.id for c in db_components}
+            for component in components:
+                entity_id = component.config.get("entity_id")
+                if entity_id in existing_map:
+                    component.id = existing_map[entity_id]
 
     async def _get_raw_states(self) -> List[HAEntityState]:
         """Fetch all entity states from the HA instance."""
@@ -88,8 +102,9 @@ class HomeAssistantConnection(BaseConnection):
         else:
             raise RequestError(f"Failed to get entities. Status: {response.status_code}")
 
-    async def get_camera_entities(self, camera_ids: Optional[List[str]] = None) -> List[DeviceComponent]:
+    async def get_camera_entities(self, camera_ids: Optional[List[str]] = None) -> List["DeviceComponent"]:
         """Identifies cameras by their domain prefix."""
+        from ..db.schemas.tables.components import DeviceComponent
         states = await self._get_raw_states()
         cameras = [s for s in states if s.entity_id.startswith(CAMERA_DOMAIN)]
         if camera_ids:
@@ -100,23 +115,12 @@ class HomeAssistantConnection(BaseConnection):
                 config=CameraComponentConfig(entity_id=c.entity_id).model_dump()
             ) for c in cameras
         ]
-        if self.component_service and self.connection_id:
-            db_components = await self.component_service.get_by_connection(
-                self.connection_id, 
-                ComponentType.CAMERA
-            )
-            
-            existing_map = {c.config.get("entity_id"): c.id for c in db_components}
-            
-            for component in components:
-                entity_id = component.config.get("entity_id")
-                if entity_id in existing_map:
-                    component.id = existing_map[entity_id]
-                    
+        await self._link_entities_to_db(components, ComponentType.CAMERA)
         return components
 
-    async def get_status_entities(self, status_ids: Optional[List[str]] = None) -> List[DeviceComponent]:
+    async def get_status_entities(self, status_ids: Optional[List[str]] = None) -> List["DeviceComponent"]:
         """Identifies statuses by their domain prefix."""
+        from ..db.schemas.tables.components import DeviceComponent
         states = await self._get_raw_states()
         statuses = [s for s in states if s.entity_id.startswith(STATUS_DOMAIN)]
         if status_ids:
@@ -134,23 +138,12 @@ class HomeAssistantConnection(BaseConnection):
             ) for s in statuses
         ]
 
-        if self.component_service and self.connection_id:
-            db_components = await self.component_service.get_by_connection(
-                self.connection_id,
-                ComponentType.STATUS
-            )
-
-            existing_map = {c.config.get("entity_id"): c.id for c in db_components}
-
-            for component in components:
-                entity_id = component.config.get("entity_id")
-                if entity_id in existing_map:
-                    component.id = existing_map[entity_id]
-
+        await self._link_entities_to_db(components, ComponentType.STATUS)
         return components
 
-    async def get_control_entities(self, control_ids: Optional[List[str]] = None) -> List[DeviceComponent]:
+    async def get_control_entities(self, control_ids: Optional[List[str]] = None) -> List["DeviceComponent"]:
         """Identifies controls by their domain prefix."""
+        from ..db.schemas.tables.components import DeviceComponent
         states = await self._get_raw_states()
         controls = [s for s in states if s.entity_id.startswith(CONTROL_DOMAIN)]
         if control_ids:
@@ -163,19 +156,7 @@ class HomeAssistantConnection(BaseConnection):
             ) for c in controls
         ]
 
-        if self.component_service and self.connection_id:
-            db_components = await self.component_service.get_by_connection(
-                self.connection_id,
-                ComponentType.CONTROL
-            )
-
-            existing_map = {c.config.get("entity_id"): c.id for c in db_components}
-
-            for component in components:
-                entity_id = component.config.get("entity_id")
-                if entity_id in existing_map:
-                    component.id = existing_map[entity_id]
-
+        await self._link_entities_to_db(components, ComponentType.CONTROL)
         return components
 
     async def trigger_control(self, control_id: str) -> bool:
