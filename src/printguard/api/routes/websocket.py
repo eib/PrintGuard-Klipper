@@ -10,7 +10,7 @@ async def live_updates_endpoint(websocket: WebSocket):
     await ws_manager.connect(websocket)
     await websocket.send_json({
         "event": WebSocketEvent.INITIAL_SYNC.value,
-        "data": state_manager.get_all_json()
+        "data": await state_manager.get_all_json()
     })
     try:
         while True:
