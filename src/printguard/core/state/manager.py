@@ -142,6 +142,18 @@ class GlobalStateManager:
             "connection_live_states": connection_states,
         }
 
+    async def get_active_detection_printer_ids(self) -> List[uuid.UUID]:
+        """Get printer IDs where detection_active is True."""
+        r = await get_redis()
+        active = []
+        async for key in r.scan_iter(match="printer:live:*"):
+            data = await r.get(key)
+            if data:
+                state = json.loads(data)
+                if state.get("detection_active"):
+                    active.append(uuid.UUID(key.split(":")[-1]))
+        return active
+
 
 ws_manager = ConnectionManager()
 state_manager = GlobalStateManager(ws_manager)
