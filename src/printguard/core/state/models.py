@@ -36,8 +36,6 @@ class InferenceClass(str, enum.Enum):
 class PrintingState(str, enum.Enum):
     IDLE = "idle"
     PRINTING = "printing"
-    OFFLINE = "offline"
-    PAUSED = "paused"
 
 class InferenceResult(BaseModel):
     class_name: InferenceClass
