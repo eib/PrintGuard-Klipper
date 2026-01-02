@@ -49,7 +49,7 @@ class ConnectionProviderLiveState(BaseModel):
 
 class PrinterLiveState(BaseModel):
     printer_id: uuid.UUID
-    status: PrintingState = PrintingState.OFFLINE
+    status: PrintingState = PrintingState.IDLE
     detection_active: bool = False
     detection_history: SafeDeque = Field(
         default_factory=lambda: deque(maxlen=settings.MAX_DETECTON_HISTORY)
