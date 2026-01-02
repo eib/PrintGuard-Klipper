@@ -13,8 +13,8 @@ class Settings(BaseSettings):
     
     # --- Database ---
     DATA_DIR: Path = PROJECT_ROOT / "data"
-    DATABASE_PATH: Path = DATA_DIR / "printguard.db"
-    DATABASE_URL: str = f"sqlite+aiosqlite:///{DATABASE_PATH}"
+    DATABASE_PATH: Path | None = None
+    DATABASE_URL: str | None = None
     
     # --- ML / Model Config ---
     MODEL_REPO_ID: str = "oliverbravery/printguard"
@@ -46,5 +46,12 @@ class Settings(BaseSettings):
         """Ensure directories exist on startup."""
         v.mkdir(parents=True, exist_ok=True)
         return v
+
+    def model_post_init(self, __context) -> None:
+        """Compute derived paths after all fields are set."""
+        if self.DATABASE_PATH is None:
+            object.__setattr__(self, "DATABASE_PATH", self.DATA_DIR / "printguard.db")
+        if self.DATABASE_URL is None:
+            object.__setattr__(self, "DATABASE_URL", f"sqlite+aiosqlite:///{self.DATABASE_PATH}")
 
 settings = Settings()
