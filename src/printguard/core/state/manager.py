@@ -67,6 +67,32 @@ class GlobalStateManager:
         await r.lpush(key, result.model_dump_json())
         await r.ltrim(key, 0, settings.MAX_DETECTON_HISTORY - 1)
 
+    async def _is_printer_connection_healthy(self, printer_id: uuid.UUID) -> bool:
+        """Check if any connection used by this printer is healthy."""
+        from ..db.session import get_session_ctx
+        r = await get_redis()
+        async with get_session_ctx() as services:
+            printer = await services.printers.get_printer_details(printer_id)
+            if not printer:
+                return False
+            components = [printer.camera_component, printer.status_component,
+                         printer.start_control, printer.stop_control]
+            conn_ids = {c.connection_id for c in components if c}
+            for conn_id in conn_ids:
+                key = CONNECTION_STATE_KEY.format(conn_id)
+                data = await r.get(key)
+                if data:
+                    state = ConnectionProviderLiveState.model_validate_json(data)
+                    if not state.is_healthy:
+                        return False
+        return True
+
+    def _should_detect(self, status: PrintingState, connection_healthy: bool) -> bool:
+        """Single source of truth for detection logic.
+        Detection is ON only when: connection is healthy AND status is PRINTING.
+        """
+        return connection_healthy and status == PrintingState.PRINTING
+
     async def update_printer_state(
         self, 
         printer_id: uuid.UUID, 
@@ -74,12 +100,20 @@ class GlobalStateManager:
         detection_active: Optional[bool] = None, 
         inference_result: Optional[InferenceResult] = None, 
     ):
-        """Updates the live state and publishes to Redis channel."""
+        """Updates the live state and publishes to Redis channel.
+        Detection auto-toggles based on _should_detect logic.
+        """
         state = await self._get_printer_state(printer_id)
+        prev_status = state.status
+        
         if status:
             state.status = status
         if detection_active is not None:
             state.detection_active = detection_active
+        elif status and prev_status != status:
+            # Auto-toggle detection
+            connection_healthy = await self._is_printer_connection_healthy(printer_id)
+            state.detection_active = self._should_detect(status, connection_healthy)
         if inference_result:
             await self._append_inference_result(printer_id, inference_result)
             state.detection_history.append(inference_result)
@@ -93,21 +127,41 @@ class GlobalStateManager:
         await r.publish(settings.REDIS_CHANNEL, json.dumps(message))
 
     async def update_connection_state(self, connection_id: uuid.UUID, is_healthy: bool):
-        """Updates connection state in Redis and publishes."""
+        """Updates connection state in Redis and publishes.
+        If connection becomes unhealthy, disables detection for all printers using it.
+        If connection becomes healthy, re-syncs detection state based on printer status.
+        """
         r = await get_redis()
         key = CONNECTION_STATE_KEY.format(connection_id)
         data = await r.get(key)
         if data:
             state = ConnectionProviderLiveState.model_validate_json(data)
+            was_healthy = state.is_healthy
         else:
             state = ConnectionProviderLiveState(connection_id=connection_id)
+            was_healthy = False
         state.is_healthy = is_healthy
         await r.set(key, state.model_dump_json())
+        if was_healthy != is_healthy:
+            await self._sync_detection_for_connection(connection_id, is_healthy)
         message = {
             "event": WebSocketEvent.CONNECTION_LIVE_STATE.value,
             "data": state.model_dump(mode="json")
         }
         await r.publish(settings.REDIS_CHANNEL, json.dumps(message))
+
+    async def _sync_detection_for_connection(self, connection_id: uuid.UUID, connection_healthy: bool):
+        """Sync detection state for printers using this connection."""
+        from ..db.session import get_session_ctx
+        async with get_session_ctx() as services:
+            printers = await services.printers.list_printers_details()
+            for printer in printers:
+                components = [printer.camera_component, printer.status_component, 
+                             printer.start_control, printer.stop_control]
+                if any(c and c.connection_id == connection_id for c in components):
+                    state = await self._get_printer_state(printer.id)
+                    should_detect = self._should_detect(state.status, connection_healthy)
+                    await self.update_printer_state(printer.id, detection_active=should_detect)
 
     async def send_update(self, update_type: WebSocketEventUpdateType, event: WebSocketEvent, record_id: str):
         """Publish CRUD update notification to Redis channel."""
