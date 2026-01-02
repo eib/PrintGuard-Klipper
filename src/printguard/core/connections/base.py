@@ -58,15 +58,9 @@ class BaseConnection:
         """Get the RTSP stream URL for a camera component."""
         raise NotImplementedError("The 'get_stream_url' connection function has not been implemented.")
 
-    def map_status_state(self, state_str: str) -> PrintingState:
+    def map_status_state(self, state_str: str, config: Optional[BaseConfig] = None) -> PrintingState:
         """Map a raw state string from the connection to a PrintingState enum.
         Override in subclasses for connection-specific mapping logic.
+        Default returns IDLE.
         """
-        state_lower = state_str.lower() if state_str else ""
-        if "printing" in state_lower:
-            return PrintingState.PRINTING
-        elif "paused" in state_lower:
-            return PrintingState.PAUSED
-        elif "idle" in state_lower or "standby" in state_lower:
-            return PrintingState.IDLE
-        return PrintingState.OFFLINE
+        return PrintingState.IDLE
