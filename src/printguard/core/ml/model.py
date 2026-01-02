@@ -28,8 +28,7 @@ def load_model() -> dict:
     global _model_info
     if _model_info is not None:
         return _model_info
-    
-    model_dir = "TODO"
+    model_dir = settings.MODEL_DIR
     session_options = ort.SessionOptions()
     session_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
     session = ort.InferenceSession(
