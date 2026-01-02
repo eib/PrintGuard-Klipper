@@ -33,6 +33,12 @@ class Settings(BaseSettings):
     # --- Detection ---
     MAX_DETECTON_HISTORY: int = 100
 
+    # --- Worker Settings ---
+    DETECTION_INTERVAL: float = 0.5
+    MAX_CONCURRENT_INFERENCES: int = 3
+    CONNECTION_HEALTH_INTERVAL: float = 10.0
+    PRINTER_STATUS_INTERVAL: float = 10.0
+
     # --- Redis ---
     REDIS_URL: str = "redis://localhost:6379"
     REDIS_DB: int = 0
