@@ -2,7 +2,7 @@ from fastapi import WebSocket
 from typing import Dict, List, Optional
 import uuid
 import json
-from .models import PrinterLiveState, InferenceResult, PrintingState, WebSocketEvent, ConnectionProviderLiveState, WebSocketEventUpdateType
+from .models import PrinterLiveState, InferenceResult, PrintingState, WebSocketEvent, ConnectionProviderLiveState, WebSocketEventUpdateType, InferenceClass
 from ..config import settings
 from ..redis_client import get_redis
 
@@ -125,6 +125,45 @@ class GlobalStateManager:
             "data": state.model_dump(mode="json")
         }
         await r.publish(settings.REDIS_CHANNEL, json.dumps(message))
+
+    async def update_printer_state_with_majority(
+        self,
+        printer_id: uuid.UUID,
+        inference_result: InferenceResult,
+        detection_majority: int,
+    ) -> bool:
+        """Update state with inference result and check majority voting.
+        
+        Returns True if majority defect detected (and detection was disabled).
+        """
+        state = await self._get_printer_state(printer_id)
+        await self._append_inference_result(printer_id, inference_result)
+        state.detection_history.append(inference_result)
+        
+        # Check majority voting on last N results
+        defect_detected = self._check_majority_defect(state.detection_history, detection_majority)
+        if defect_detected:
+            state.detection_active = False
+        
+        await self._save_printer_state(state)
+        r = await get_redis()
+        message = {
+            "event": WebSocketEvent.PRINTER_LIVE_STATE.value,
+            "data": state.model_dump(mode="json")
+        }
+        await r.publish(settings.REDIS_CHANNEL, json.dumps(message))
+        return defect_detected
+
+    def _check_majority_defect(self, history, window_size: int) -> bool:
+        """Check if majority of last window_size detections are defects.
+        
+        Ties (equal defect/success) count as NOT defect.
+        """
+        if len(history) < window_size:
+            return False
+        recent = list(history)[-window_size:]
+        defect_count = sum(1 for r in recent if r.class_name == InferenceClass.DEFECT)
+        return defect_count > window_size // 2
 
     async def update_connection_state(self, connection_id: uuid.UUID, is_healthy: bool):
         """Updates connection state in Redis and publishes.

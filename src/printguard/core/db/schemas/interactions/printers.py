@@ -7,6 +7,7 @@ class PrinterRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     name: str
+    detection_majority: int = 3
     camera_component: Optional[ComponentRead] = None
     status_component: Optional[ComponentRead] = None
     start_control: Optional[ComponentRead] = None
@@ -14,6 +15,7 @@ class PrinterRead(BaseModel):
 
 class PrinterCreate(BaseModel):
     name: str
+    detection_majority: int = 3
     camera_comp_id: Optional[uuid.UUID] = None
     status_comp_id: Optional[uuid.UUID] = None
     start_ctrl_comp_id: Optional[uuid.UUID] = None

@@ -1,6 +1,6 @@
 import uuid
 from typing import Optional
-from sqlalchemy import ForeignKey, String, select
+from sqlalchemy import ForeignKey, Integer, String, select
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship, validates, object_session
 
@@ -12,6 +12,7 @@ class Printer(Base):
     __tablename__ = "printers"
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
+    detection_majority: Mapped[int] = mapped_column(Integer, default=3, nullable=False)
 
     camera_comp_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("device_components.id"))
     status_comp_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("device_components.id"))

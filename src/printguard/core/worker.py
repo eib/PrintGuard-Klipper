@@ -111,24 +111,30 @@ class WorkerOrchestrator:
                 active_printer_ids = await state_manager.get_active_detection_printer_ids()
                 if active_printer_ids:
                     async with get_session_ctx() as services:
+                        stream_manager = StreamManager(services)
                         tasks = []
                         for printer_id in active_printer_ids:
                             printer = await services.printers.get_printer_details(printer_id)
                             if printer and printer.camera_component:
                                 camera_path = str(printer.camera_component.id)
                                 camera_config = printer.camera_component.config
-                                tasks.append(self._run_single_inference(printer_id, camera_path, services, camera_config))
+                                detection_majority = printer.detection_majority
+                                tasks.append(self._run_single_inference(
+                                    printer_id, camera_path, camera_config, detection_majority, stream_manager
+                                ))
                         if tasks:
                             await asyncio.gather(*tasks, return_exceptions=True)
             except Exception as e:
                 logger.error(f"Inference orchestrator error: {e}")
             await self._wait_interval(settings.DETECTION_INTERVAL)
 
-    async def _run_single_inference(self, printer_id: uuid.UUID, camera_path: str, services, camera_config):
+    async def _run_single_inference(
+        self, printer_id: uuid.UUID, camera_path: str, camera_config: dict, 
+        detection_majority: int, stream_manager: StreamManager
+    ):
         """Run inference for a single printer with semaphore control."""
         async with self.inference_semaphore:
             try:
-                stream_manager = StreamManager(services)
                 snapshot = await stream_manager.get_snapshot(camera_path)
                 if snapshot is None:
                     logger.warning(f"No snapshot for printer {printer_id}")
@@ -145,7 +151,12 @@ class WorkerOrchestrator:
                     confidence=result["confidence"],
                     timestamp=datetime.now(),
                 )
-                await state_manager.update_printer_state(printer_id, inference_result=inference_result)
+                # Update state and check majority voting
+                defect_detected = await state_manager.update_printer_state_with_majority(
+                    printer_id, inference_result, detection_majority
+                )
+                if defect_detected:
+                    logger.info(f"Majority defect detected for printer {printer_id}, disabling detection")
             except Exception as e:
                 logger.error(f"Inference failed for printer {printer_id}: {e}", exc_info=True)
 
