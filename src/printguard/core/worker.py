@@ -120,8 +120,10 @@ class WorkerOrchestrator:
                                 camera_path = str(printer.camera_component.id)
                                 camera_config = printer.camera_component.config
                                 detection_majority = printer.detection_majority
+                                stop_component = printer.stop_control
                                 tasks.append(self._run_single_inference(
-                                    printer_id, camera_path, camera_config, detection_majority, stream_manager
+                                    printer_id, camera_path, camera_config, detection_majority,
+                                    stream_manager, stop_component
                                 ))
                         if tasks:
                             await asyncio.gather(*tasks, return_exceptions=True)
@@ -131,7 +133,7 @@ class WorkerOrchestrator:
 
     async def _run_single_inference(
         self, printer_id: uuid.UUID, camera_path: str, camera_config: dict, 
-        detection_majority: int, stream_manager: StreamManager
+        detection_majority: int, stream_manager: StreamManager, stop_component=None
     ):
         """Run inference for a single printer with semaphore control."""
         async with self.inference_semaphore:
@@ -159,12 +161,35 @@ class WorkerOrchestrator:
                 if defect_detected:
                     logger.info(f"Majority defect detected for printer {printer_id}, disabling detection")
                     async with get_session_ctx() as services:
-                        await services.push_subscriptions.send_printer_devices(
+                        # Auto-stop print if stop control configured
+                        if stop_component:
+                            await self._trigger_stop_control(stop_component, services)
+                        # Send push notifications
+                        await services.push_subscriptions.send_to_printer(
                             printer_id,
                             PrinterDefectMajorityPushPayload(printer_id=printer_id)
                         )
             except Exception as e:
                 logger.error(f"Inference failed for printer {printer_id}: {e}", exc_info=True)
+
+    async def _trigger_stop_control(self, stop_component, services) -> None:
+        """Trigger the stop control component to halt the print."""
+        try:
+            conn = await services.connections.get(stop_component.connection_id)
+            if not conn:
+                logger.warning(f"Connection not found for stop control {stop_component.id}")
+                return
+            connection = get_connection_instance(conn, services)
+            if not connection:
+                logger.warning(f"Could not instantiate connection for stop control")
+                return
+            success = await connection.trigger_control(stop_component.entity_id)
+            if success:
+                logger.info(f"Stop control triggered for component {stop_component.id}")
+            else:
+                logger.warning(f"Failed to trigger stop control {stop_component.id}")
+        except Exception as e:
+            logger.error(f"Error triggering stop control: {e}", exc_info=True)
 
 
 worker_orchestrator = WorkerOrchestrator()

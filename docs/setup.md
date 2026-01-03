@@ -221,6 +221,33 @@ Expected response:
 
 ---
 
+## Auto-Stop on Defect
+
+PrintGuard can automatically stop a print when a defect is detected. This feature uses a **stop control component** linked to your printer.
+
+### How to Enable
+
+1. **Create a control component** in PrintGuard that maps to a switch, button, or relay that can stop your printer (e.g., a smart plug controlling power, or a Home Assistant script that sends a stop command via printer API)
+
+2. **Link the component to your printer** by setting the `stop_ctrl_comp_id` field on the printer to the ID of your control component
+
+3. When a defect is detected (majority classification), PrintGuard will automatically trigger that control
+
+### How to Disable
+
+Simply remove or unset the `stop_ctrl_comp_id` field on the printer. Defect detection will continue, but no automatic stop will occur.
+
+### Example Use Cases
+
+| Control Type | Description |
+|--------------|-------------|
+| Smart Plug | Cut power to printer on defect |
+| HA Script | Call printer API to pause/cancel print |
+| Relay Switch | Toggle emergency stop circuit |
+| MQTT Button | Send stop command to OctoPrint/Klipper |
+
+---
+
 ## Next Steps
 
 - [API Reference](api.md) - Endpoint documentation

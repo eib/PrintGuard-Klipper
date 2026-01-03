@@ -372,6 +372,34 @@ Control Component (HomeAssistant):
 
 ---
 
+## Defect Response Features
+
+When a defect is detected (majority classification over recent inferences), PrintGuard can automatically respond in two ways:
+
+### Auto-Stop on Defect
+
+If a printer has a **stop control component** configured (`stop_ctrl_comp_id`), PrintGuard will automatically trigger that control to stop the print when a defect is detected.
+
+**How it works:**
+1. Inference detects defect as the majority class
+2. System checks if the printer has `stop_ctrl_comp_id` set
+3. If set, PrintGuard calls `trigger_control()` on that component via the connection interface
+4. The connection (e.g., Home Assistant) sends the stop command to the printer
+
+**To enable auto-stop:**
+- Create a control component linked to your printer's power/stop control (e.g., a smart plug or printer API endpoint)
+- Set the `stop_ctrl_comp_id` field on the printer to reference that component
+
+**To disable auto-stop:**
+- Remove or unset the `stop_ctrl_comp_id` field on the printer
+- The printer will still detect defects but won't automatically stop
+
+### Push Notifications
+
+Users who have subscribed to a printer's notifications will receive a web push alert when a defect is detected. See the Push Notification section for subscription management.
+
+---
+
 ## WebSocket Architecture
 
 ### Connection Flow
