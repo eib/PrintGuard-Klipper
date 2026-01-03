@@ -20,3 +20,11 @@ class PrinterCreate(BaseModel):
     status_comp_id: Optional[uuid.UUID] = None
     start_ctrl_comp_id: Optional[uuid.UUID] = None
     stop_ctrl_comp_id: Optional[uuid.UUID] = None
+
+class PrinterUpdate(BaseModel):
+    name: Optional[str] = None
+    detection_majority: Optional[int] = None
+    camera_comp_id: Optional[uuid.UUID] = None
+    status_comp_id: Optional[uuid.UUID] = None
+    start_ctrl_comp_id: Optional[uuid.UUID] = None
+    stop_ctrl_comp_id: Optional[uuid.UUID] = None
