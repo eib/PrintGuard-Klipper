@@ -1,11 +1,34 @@
 """Inference functions."""
 
 from io import BytesIO
-from typing import Union
+from typing import Mapping, Optional, Union
 
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageEnhance
 from torchvision import transforms
+
+
+def _clamp(value: float, lower: float = 0.0, upper: float = 500.0) -> float:
+    return max(lower, min(upper, value))
+
+
+def apply_image_tuning(image: Image.Image, tuning: Optional[Mapping[str, object]]) -> Image.Image:
+    """Apply brightness/contrast/sharpness adjustments from camera config."""
+    if not tuning:
+        return image
+
+    try:
+        brightness_factor = _clamp(float(tuning.get("brightness", 100.0))) / 100.0
+        contrast_factor = _clamp(float(tuning.get("contrast", 100.0))) / 100.0
+        sharpness_factor = _clamp(float(tuning.get("sharpness", 100.0))) / 100.0
+    except Exception:
+        # Fail open if config values are malformed
+        return image
+
+    image = ImageEnhance.Brightness(image).enhance(brightness_factor)
+    image = ImageEnhance.Contrast(image).enhance(contrast_factor)
+    image = ImageEnhance.Sharpness(image).enhance(sharpness_factor)
+    return image
 
 
 def get_transform():
@@ -19,20 +42,26 @@ def get_transform():
     ])
 
 
-def preprocess_image(image: Union[bytes, Image.Image]) -> np.ndarray:
+def preprocess_image(image: Union[bytes, Image.Image], tuning: Optional[Mapping[str, object]] = None) -> np.ndarray:
     """Preprocess image for inference."""
     transform = get_transform()
     if isinstance(image, bytes):
         image = Image.open(BytesIO(image)).convert('RGB')
     else:
         image = image.convert('RGB')
+    image = apply_image_tuning(image, tuning)
     tensor = transform(image)
     return tensor.unsqueeze(0).numpy()
 
 
-def predict(image: Union[bytes, Image.Image], model_info: dict, sensitivity: float = 1.0) -> dict:
+def predict(
+    image: Union[bytes, Image.Image],
+    model_info: dict,
+    sensitivity: float = 1.0,
+    tuning: Optional[Mapping[str, object]] = None,
+) -> dict:
     """Run prediction on an image."""
-    image_array = preprocess_image(image)
+    image_array = preprocess_image(image, tuning)
     # Get embedding
     outputs = model_info["session"].run(
         [model_info["output_name"]], 

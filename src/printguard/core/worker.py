@@ -116,14 +116,15 @@ class WorkerOrchestrator:
                             printer = await services.printers.get_printer_details(printer_id)
                             if printer and printer.camera_component:
                                 camera_path = str(printer.camera_component.id)
-                                tasks.append(self._run_single_inference(printer_id, camera_path, services))
+                                camera_config = printer.camera_component.config
+                                tasks.append(self._run_single_inference(printer_id, camera_path, services, camera_config))
                         if tasks:
                             await asyncio.gather(*tasks, return_exceptions=True)
             except Exception as e:
                 logger.error(f"Inference orchestrator error: {e}")
             await self._wait_interval(settings.DETECTION_INTERVAL)
 
-    async def _run_single_inference(self, printer_id: uuid.UUID, camera_path: str, services):
+    async def _run_single_inference(self, printer_id: uuid.UUID, camera_path: str, services, camera_config):
         """Run inference for a single printer with semaphore control."""
         async with self.inference_semaphore:
             try:
@@ -132,7 +133,13 @@ class WorkerOrchestrator:
                 if snapshot is None:
                     logger.warning(f"No snapshot for printer {printer_id}")
                     return
-                result = await asyncio.to_thread(predict, snapshot, self.model_info)
+                result = await asyncio.to_thread(
+                    predict,
+                    snapshot,
+                    self.model_info,
+                    sensitivity=1.0,
+                    tuning=camera_config,
+                )
                 inference_result = InferenceResult(
                     class_name=InferenceClass(result["class_name"]),
                     confidence=result["confidence"],

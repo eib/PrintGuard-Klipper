@@ -2,7 +2,7 @@ from typing import Literal, Optional, List, Dict, Any, TYPE_CHECKING
 import uuid
 from datetime import datetime
 from httpx import RequestError
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 if TYPE_CHECKING:
     from ..db.session import ServiceManager
@@ -29,6 +29,9 @@ class HABaseComponentConfig(BaseModel):
 
 class CameraComponentConfig(HABaseComponentConfig):
     entity_id: str
+    brightness: float = Field(100.0, ge=0.0, le=500.0)
+    contrast: float = Field(100.0, ge=0.0, le=500.0)
+    sharpness: float = Field(100.0, ge=0.0, le=500.0)
 
 class StatusComponentConfig(HABaseComponentConfig):
     entity_id: str
