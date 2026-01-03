@@ -1,5 +1,5 @@
 import uuid
-from typing import Union
+from typing import Optional, Union
 from pydantic import BaseModel, ConfigDict
 
 from ...types import ComponentType
@@ -29,3 +29,10 @@ class ComponentCreate(BaseModel):
             ConnectionStatusComponentConfig, 
             ConnectionControlComponentConfig
             ]
+
+class ComponentUpdate(BaseModel):
+    config: Optional[Union[
+            ConnectionCameraComponentConfig,
+            ConnectionStatusComponentConfig,
+            ConnectionControlComponentConfig
+            ]] = None
