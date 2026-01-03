@@ -1,6 +1,7 @@
 import asyncio
+import base64
 import logging
-from typing import Optional, List
+from typing import Optional, List, Dict
 import cv2
 from pydantic import BaseModel
 
@@ -24,6 +25,15 @@ class StreamManager:
         self.base_api_url = settings.MEDIAMTX_API_URL
         self.base_webrtc_url = settings.MEDIAMTX_WEBRTC_URL
 
+    def _auth_headers(self) -> Optional[Dict[str, str]]:
+        """Return Basic Auth header if credentials provided."""
+        user = settings.MEDIAMTX_API_USERNAME
+        pwd = settings.MEDIAMTX_API_PASSWORD
+        if user and pwd:
+            token = base64.b64encode(f"{user}:{pwd}".encode()).decode()
+            return {"Authorization": f"Basic {token}"}
+        return None
+
     async def register_camera(self, path: str, source_url: str) -> bool:
         """Registers a camera stream with MediaMTX."""
         is_registered = await self.check_health(path)
@@ -34,6 +44,7 @@ class StreamManager:
             params=RequestParams(
                 url=f"{self.base_api_url}/config/paths/add/{path}",
                 method=HTTPMethod.POST,
+                headers=self._auth_headers(),
                 json_data={
                     "source": source_url,
                     "sourceOnDemand": False
@@ -53,7 +64,8 @@ class StreamManager:
         response = await http_client.run_async(
             params=RequestParams(
                 url=f"{self.base_api_url}/config/paths/delete/{path}",
-                method=HTTPMethod.DELETE
+                method=HTTPMethod.DELETE,
+                headers=self._auth_headers(),
             )
         )
         
@@ -69,7 +81,8 @@ class StreamManager:
         response = await http_client.run_async(
             params=RequestParams(
                 url=f"{self.base_api_url}/paths/list",
-                method=HTTPMethod.GET
+                method=HTTPMethod.GET,
+                headers=self._auth_headers(),
             )
         )
         
@@ -121,7 +134,8 @@ class StreamManager:
         response = await http_client.run_async(
             params=RequestParams(
                 url=f"{self.base_api_url}/paths/get/{path}",
-                method=HTTPMethod.GET
+                method=HTTPMethod.GET,
+                headers=self._auth_headers(),
             )
         )
         if response.is_success and response.status_code == 200:

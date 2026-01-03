@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     # --- MediaMTX ---
     MEDIAMTX_API_URL: str = "http://localhost:9997/v3"
     MEDIAMTX_WEBRTC_URL: str = "http://localhost:8889"
+    MEDIAMTX_API_USERNAME: str | None = None
+    MEDIAMTX_API_PASSWORD: str | None = None
 
     # --- SafeHTTPClient ---
     MAX_RETRIES: int = 3

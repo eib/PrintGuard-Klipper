@@ -1,0 +1,19 @@
+# MediaMTX configuration for PrintGuard
+# Allows API access from any IP (needed for Docker inter-container communication)
+
+api: yes
+apiAddress: :9997
+
+rtspTransports: [tcp]
+
+authInternalUsers:
+  # Allow anonymous access to API from any IP
+  - user: any
+    pass:
+    ips: []
+    permissions:
+      - action: api
+      - action: publish
+      - action: read
+      - action: playback
+      - action: metrics
