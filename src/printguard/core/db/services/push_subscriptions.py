@@ -5,6 +5,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..schemas.tables.device_push_subscriptions import DevicePushSubscription
+from ..schemas.tables.printer_subscriptions import PrinterSubscription
 from ..schemas.interactions.push_subscriptions import PushSubscriptionCreate
 from ...notifications.webpush import WebPushClient, WebPushSendResult
 from ...notifications.models import PushPayloadBase
@@ -100,6 +101,24 @@ class PushSubscriptionService:
         )
 
         subs = await self.list_all()
+        return await self._send(client, subs, payload)
+
+    async def send_printer_devices(self, printer_id: uuid.UUID, payload: PushPayloadBase) -> WebPushSendResult:
+        """Send push only to device subscriptions whose identity is subscribed to the printer."""
+        keys = ensure_vapid_configured()
+        if not keys:
+            logger.debug("WebPush not configured; skipping send")
+            return WebPushSendResult(sent=0, failed=0, deleted=0)
+
+        client = WebPushClient(
+            vapid_private_key=keys.private_key,
+            vapid_subject=keys.subject,
+        )
+
+        subs = await self._list_for_printer(printer_id)
+        return await self._send(client, subs, payload)
+
+    async def _send(self, client: WebPushClient, subs: List[DevicePushSubscription], payload: PushPayloadBase) -> WebPushSendResult:
         payload_json = payload.model_dump_json()
         sent = 0
         failed = 0
@@ -136,6 +155,15 @@ class PushSubscriptionService:
             await self.session.commit()
 
         return WebPushSendResult(sent=sent, failed=failed, deleted=deleted)
+
+    async def _list_for_printer(self, printer_id: uuid.UUID) -> List[DevicePushSubscription]:
+        stmt = (
+            select(DevicePushSubscription)
+            .join(PrinterSubscription, PrinterSubscription.identity_id == DevicePushSubscription.identity_id)
+            .where(PrinterSubscription.printer_id == printer_id)
+        )
+        result = await self.session.execute(stmt)
+        return list(result.scalars().all())
 
     async def _get_by_endpoint(self, endpoint: str) -> Optional[DevicePushSubscription]:
         result = await self.session.execute(

@@ -10,7 +10,8 @@ from .services.components import ComponentService
 from .services.identities import IdentityService
 from .services.connections import ConnectionService
 from .services.push_subscriptions import PushSubscriptionService
-from .schemas.tables import connections, components, printers, identities, device_push_subscriptions
+from .services.printer_subscriptions import PrinterSubscriptionService
+from .schemas.tables import connections, components, printers, identities, device_push_subscriptions, printer_subscriptions
 
 engine = create_async_engine(settings.DATABASE_URL, echo=True)
 AsyncSessionLocal = async_sessionmaker(bind=engine, class_=AsyncSession, expire_on_commit=False)
@@ -29,6 +30,7 @@ class ServiceManager:
         self.identities = IdentityService(session, self.state_manager)
         self.connections = ConnectionService(session, self.state_manager)
         self.push_subscriptions = PushSubscriptionService(session, self.state_manager)
+        self.printer_subscriptions = PrinterSubscriptionService(session, self.state_manager)
 
 @asynccontextmanager
 async def get_session_ctx() -> AsyncGenerator[ServiceManager, None]:

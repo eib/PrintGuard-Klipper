@@ -157,6 +157,8 @@ Returns API health status.
 
 PrintGuard supports standard Web Push subscriptions (VAPID).
 
+Users can opt-in per printer; notifications only go to identities subscribed to that printer.
+
 If a push send returns `410 Gone`, the server deletes that subscription immediately.
 
 #### Payloads
@@ -196,6 +198,17 @@ Register or update a browser/device push subscription. **Requires authentication
   "user_agent": "..."
 }
 ```
+
+#### Printer Subscriptions (per-user, per-printer)
+
+##### `GET /api/push/printers/`
+- Auth required. Lists printers the current user is subscribed to for push notifications.
+
+##### `POST /api/push/printers/subscribe`
+- Auth required. Body: `{ "printer_id": "uuid-string" }`
+
+##### `POST /api/push/printers/unsubscribe`
+- Auth required. Body: `{ "printer_id": "uuid-string" }`
 
 #### `POST /api/push/unsubscribe`
 
@@ -241,6 +254,8 @@ ws.onclose = () => {
 ```
 
 ### WebSocket Events
+
+CRUD updates include `PRINTER_SUBSCRIPTION_UPDATE` when a user subscribes/unsubscribes to a printer for push notifications.
 
 #### Initial Sync
 

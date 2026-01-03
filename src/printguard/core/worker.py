@@ -159,7 +159,8 @@ class WorkerOrchestrator:
                 if defect_detected:
                     logger.info(f"Majority defect detected for printer {printer_id}, disabling detection")
                     async with get_session_ctx() as services:
-                        await services.push_subscriptions.send_to_all(
+                        await services.push_subscriptions.send_printer_devices(
+                            printer_id,
                             PrinterDefectMajorityPushPayload(printer_id=printer_id)
                         )
             except Exception as e:
