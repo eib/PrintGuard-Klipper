@@ -49,6 +49,12 @@ class Settings(BaseSettings):
     # --- WebPush (VAPID) ---
     WEBPUSH_VAPID_KEYS_PATH: Path | None = None
 
+    # --- Auth / JWT ---
+    JWT_SECRET_KEY: str = ""  # If empty, auto-generated and saved to DATA_DIR
+    JWT_ALGORITHM: str = "HS256"
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
+    AUTH_CODE_EXPIRY_MINUTES: int = 10
+
     # --- Pydantic Configuration ---
     model_config = SettingsConfigDict(
         env_file=".env", 

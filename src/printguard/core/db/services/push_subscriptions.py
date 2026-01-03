@@ -1,4 +1,5 @@
 import logging
+import uuid
 from typing import List, Optional
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,10 +20,18 @@ class PushSubscriptionService:
         self.session = session
         self.state_manager = state_manager
 
-    async def upsert(self, data: PushSubscriptionCreate) -> DevicePushSubscription:
+    async def upsert(
+        self,
+        data: PushSubscriptionCreate,
+        identity_id: uuid.UUID,
+    ) -> DevicePushSubscription:
+        """Create or update a push subscription. Requires authenticated identity."""
         existing = await self._get_by_endpoint(data.endpoint)
         if existing:
-            existing.identity_id = data.identity_id
+            # Only owner can update their subscription
+            if existing.identity_id != identity_id:
+                raise PermissionError("Subscription belongs to another user")
+
             existing.p256dh = data.keys.p256dh
             existing.auth = data.keys.auth
             existing.expiration_time_ms = data.expiration_time_ms
@@ -37,7 +46,7 @@ class PushSubscriptionService:
             return existing
 
         obj = DevicePushSubscription(
-            identity_id=data.identity_id,
+            identity_id=identity_id,
             endpoint=data.endpoint,
             p256dh=data.keys.p256dh,
             auth=data.keys.auth,
@@ -54,12 +63,19 @@ class PushSubscriptionService:
         )
         return obj
 
-    async def unsubscribe_by_endpoint(self, endpoint: str) -> bool:
+    async def unsubscribe(self, endpoint: str, identity_id: uuid.UUID) -> bool:
+        """Delete a subscription. Only the owner can delete their subscription."""
         existing = await self._get_by_endpoint(endpoint)
         if not existing:
             return True
 
-        await self.session.execute(delete(DevicePushSubscription).where(DevicePushSubscription.id == existing.id))
+        # Ownership check: only owner can delete
+        if existing.identity_id != identity_id:
+            raise PermissionError("Cannot delete subscription owned by another user")
+
+        await self.session.execute(
+            delete(DevicePushSubscription).where(DevicePushSubscription.id == existing.id)
+        )
         await self.session.commit()
         await self.state_manager.send_update(
             WebSocketEventUpdateType.DELETE,

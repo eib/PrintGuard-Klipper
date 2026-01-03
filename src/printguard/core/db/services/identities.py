@@ -8,6 +8,7 @@ from ..schemas.interactions.identities import UserCreate, ServiceAccountCreate, 
 from ..types import IdentityType
 from ...state.manager import GlobalStateManager
 from ...state.models import WebSocketEvent, WebSocketEventUpdateType
+from ...security.passwords import hash_password
 
 class IdentityService:
     """Manages the complex multi-table structure of Identities, Users, and Scopes."""
@@ -26,7 +27,11 @@ class IdentityService:
 
     async def get_user_by_username(self, username: str) -> Optional[User]:
         result = await self.session.execute(
-            select(User).where(User.username == username).options(joinedload(User.identity))
+            select(User)
+            .where(User.username == username)
+            .options(
+                joinedload(User.identity).joinedload(Identity.scopes)
+            )
         )
         return result.scalar_one_or_none()
 
@@ -37,7 +42,7 @@ class IdentityService:
         user = User(
             identity_id=identity.id,
             username=data.username,
-            password_hash=f"pbkdf2:{data.password}" 
+            password_hash=hash_password(data.password)
         )
         self.session.add(user)
         for scope_type in data.scopes:
@@ -53,7 +58,7 @@ class IdentityService:
         await self.session.flush()
         sa = ServiceAccount(
             identity_id=identity.id,
-            client_secret_hash=f"pbkdf2:{data.client_secret}"
+            client_secret_hash=hash_password(data.client_secret)
         )
         self.session.add(sa)
         for scope_type in data.scopes:
@@ -72,10 +77,10 @@ class IdentityService:
             if data.username is not None:
                 identity.user.username = data.username
             if data.password is not None:
-                identity.user.password_hash = f"pbkdf2:{data.password}"
+                identity.user.password_hash = hash_password(data.password)
         # Update linked ServiceAccount table
         if identity.service_account and data.client_secret is not None:
-            identity.service_account.client_secret_hash = f"pbkdf2:{data.client_secret}"
+            identity.service_account.client_secret_hash = hash_password(data.client_secret)
         # Sync Scopes if provided
         if data.scopes is not None:
             await self.session.execute(delete(IdentityScope).where(IdentityScope.identity_id == identity_id))

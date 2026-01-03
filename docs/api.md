@@ -24,7 +24,115 @@ For Docker deployments, replace `localhost` with your server's hostname or IP.
 
 ## Authentication
 
-> **Note:** Authentication is not yet implemented in the current version. All endpoints are currently open.
+PrintGuard uses OAuth 2.0 with JWT tokens. Supports:
+- **Authorization Code + PKCE** — Secure flow for public clients (SPAs, mobile apps)
+- **Client Credentials** — M2M service accounts
+
+### Scopes
+
+| Scope | Description |
+|-------|-------------|
+| `admin` | Full administrative access |
+| `user` | Standard user access |
+
+### Authorization Code Flow with PKCE
+
+#### Step 1: Generate PKCE Values (Client-side)
+
+```javascript
+// Generate code_verifier (43-128 chars)
+const codeVerifier = generateRandomString(64);
+
+// Generate code_challenge = base64url(sha256(code_verifier))
+const encoder = new TextEncoder();
+const data = encoder.encode(codeVerifier);
+const digest = await crypto.subtle.digest('SHA-256', data);
+const codeChallenge = base64UrlEncode(digest);
+```
+
+#### Step 2: Authorize
+
+##### `POST /api/auth/authorize`
+
+**Request:**
+```json
+{
+  "username": "user@example.com",
+  "password": "password",
+  "code_challenge": "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM",
+  "code_challenge_method": "S256",
+  "redirect_uri": "https://myapp.com/callback",
+  "state": "random-state-value"
+}
+```
+
+**Response (if redirect_uri provided):** 302 redirect to `redirect_uri?code=...&state=...`
+
+**Response (if no redirect_uri):**
+```json
+{
+  "code": "authorization-code",
+  "state": "random-state-value"
+}
+```
+
+#### Step 3: Exchange Code for Token
+
+##### `POST /api/auth/token`
+
+**Request:**
+```json
+{
+  "grant_type": "authorization_code",
+  "code": "authorization-code",
+  "code_verifier": "original-code-verifier",
+  "redirect_uri": "https://myapp.com/callback"
+}
+```
+
+**Response:**
+```json
+{
+  "access_token": "eyJhbGc...",
+  "token_type": "bearer"
+}
+```
+
+### M2M / Service Account (Client Credentials)
+
+##### `POST /api/auth/token`
+
+**Request:**
+```json
+{
+  "grant_type": "client_credentials",
+  "client_id": "uuid-string",
+  "client_secret": "your-secret"
+}
+```
+
+**Response:**
+```json
+{
+  "access_token": "eyJhbGc...",
+  "token_type": "bearer"
+}
+```
+
+### Current Identity
+
+#### `GET /api/auth/me`
+
+Returns the authenticated identity. Requires `Authorization: Bearer <token>`.
+
+**Response:**
+```json
+{
+  "identity_id": "uuid-string",
+  "type": "user",
+  "scopes": ["user"]
+}
+```
 
 ---
 
@@ -57,18 +165,17 @@ When a majority defect is detected, PrintGuard sends:
 
 ```json
 {
-    "type": "printer_defect",
+    "type": "printer_defect"
 }
 ```
 
 #### `POST /api/push/subscribe`
 
-Register or update a browser/device push subscription.
+Register or update a browser/device push subscription. **Requires authentication.**
 
 **Request:**
 ```json
 {
-  "identity_id": "uuid-string (optional)",
   "endpoint": "https://...",
   "keys": {
     "p256dh": "...",
@@ -83,7 +190,7 @@ Register or update a browser/device push subscription.
 ```json
 {
   "id": "uuid-string",
-  "identity_id": "uuid-string (optional)",
+  "identity_id": "uuid-string",
   "endpoint": "https://...",
   "expiration_time_ms": 0,
   "user_agent": "..."
@@ -92,7 +199,7 @@ Register or update a browser/device push subscription.
 
 #### `POST /api/push/unsubscribe`
 
-Remove a subscription by endpoint.
+Remove a subscription by endpoint. **Requires authentication; owner-only.**
 
 **Request:**
 ```json

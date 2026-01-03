@@ -26,3 +26,7 @@ redis>=5.0.0
 
 # Web Push notifications (VAPID)
 pywebpush>=2.0.0
+
+# Authentication
+passlib[bcrypt]>=1.7.4
+python-jose[cryptography]>=3.3.0

@@ -10,7 +10,7 @@ class PushSubscriptionKeys(BaseModel):
 
 
 class PushSubscriptionCreate(BaseModel):
-    identity_id: Optional[uuid.UUID] = None
+    """Client request to create/update a push subscription. Identity derived from auth."""
     endpoint: str
     keys: PushSubscriptionKeys
     expiration_time_ms: Optional[int] = None
