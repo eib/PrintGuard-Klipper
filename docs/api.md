@@ -150,6 +150,268 @@ Returns API health status.
   "status": "ok",
   "version": "0.1.0"
 }
+```
+
+---
+
+### Printers
+
+CRUD operations for managing printers.
+
+#### `GET /api/printers/`
+
+List all printers with their components. **Requires authentication.**
+
+**Response:**
+```json
+[
+  {
+    "id": "uuid-string",
+    "name": "Ender 3 Pro",
+    "detection_majority": 3,
+    "camera_component": { ... },
+    "status_component": { ... },
+    "start_control": { ... },
+    "stop_control": { ... }
+  }
+]
+```
+
+#### `GET /api/printers/{printer_id}`
+
+Get a single printer by ID. **Requires authentication.**
+
+**Response:** Single printer object (see above).
+
+#### `POST /api/printers/`
+
+Create a new printer. **Requires authentication.**
+
+**Request:**
+```json
+{
+  "name": "My Printer",
+  "detection_majority": 3,
+  "camera_comp_id": "uuid-string",
+  "status_comp_id": "uuid-string",
+  "start_ctrl_comp_id": "uuid-string",
+  "stop_ctrl_comp_id": "uuid-string"
+}
+```
+
+**Response:** `201 Created` with printer object.
+
+#### `PATCH /api/printers/{printer_id}`
+
+Update an existing printer. **Requires authentication.**
+
+**Request:** (any subset of fields)
+```json
+{
+  "name": "Updated Name",
+  "detection_majority": 5
+}
+```
+
+**Response:** Updated printer object.
+
+#### `DELETE /api/printers/{printer_id}`
+
+Delete a printer. **Requires authentication.**
+
+**Response:** `204 No Content`
+
+---
+
+### Components
+
+CRUD operations for device components (cameras, status sensors, controls).
+
+#### `GET /api/components/`
+
+List all components with their connections. **Requires authentication.**
+
+**Response:**
+```json
+[
+  {
+    "id": "uuid-string",
+    "type": "camera",
+    "config": {
+      "provider": "homeassistant",
+      "entity_id": "camera.printer_cam",
+      "brightness": 100.0,
+      "contrast": 100.0,
+      "sharpness": 100.0
+    },
+    "connection": { ... }
+  }
+]
+```
+
+#### `GET /api/components/{component_id}`
+
+Get a single component by ID. **Requires authentication.**
+
+**Response:** Single component object.
+
+#### `POST /api/components/`
+
+Create a new component. **Requires authentication.**
+
+**Request:**
+```json
+{
+  "type": "camera",
+  "connection_id": "uuid-string",
+  "config": {
+    "provider": "homeassistant",
+    "entity_id": "camera.my_cam",
+    "brightness": 100.0,
+    "contrast": 100.0,
+    "sharpness": 100.0
+  }
+}
+```
+
+**Response:** `201 Created` with component object.
+
+#### `PATCH /api/components/{component_id}`
+
+Update a component's configuration. **Requires authentication.**
+
+**Request:**
+```json
+{
+  "config": {
+    "provider": "homeassistant",
+    "entity_id": "camera.my_cam",
+    "brightness": 120.0,
+    "contrast": 110.0,
+    "sharpness": 100.0
+  }
+}
+```
+
+**Response:** Updated component object.
+
+#### `DELETE /api/components/{component_id}`
+
+Delete a component. **Requires authentication.**
+
+**Response:** `204 No Content`
+
+---
+
+### Connections
+
+CRUD operations for provider connections (e.g., Home Assistant).
+
+#### `GET /api/connections/`
+
+List all connections. **Requires authentication.**
+
+**Response:**
+```json
+[
+  {
+    "id": "uuid-string",
+    "name": "Home Assistant",
+    "configuration": {
+      "provider": "homeassistant",
+      "url": "http://homeassistant.local:8123",
+      "api_key": "eyJ..."
+    }
+  }
+]
+```
+
+#### `GET /api/connections/{connection_id}`
+
+Get a single connection by ID. **Requires authentication.**
+
+**Response:** Single connection object.
+
+#### `POST /api/connections/`
+
+Create a new connection. **Requires authentication.**
+
+**Request:**
+```json
+{
+  "name": "My Home Assistant",
+  "configuration": {
+    "provider": "homeassistant",
+    "url": "http://homeassistant.local:8123",
+    "api_key": "your-long-lived-access-token"
+  }
+}
+```
+
+**Response:** `201 Created` with connection object.
+
+#### `PATCH /api/connections/{connection_id}`
+
+Update an existing connection. **Requires authentication.**
+
+**Request:** (any subset of fields)
+```json
+{
+  "name": "Updated Name"
+}
+```
+
+**Response:** Updated connection object.
+
+#### `DELETE /api/connections/{connection_id}`
+
+Delete a connection. **Requires authentication.**
+
+**Response:** `204 No Content`
+
+---
+
+### Control
+
+Trigger control components (e.g., start/stop print).
+
+#### `POST /api/control/{component_id}/trigger`
+
+Trigger a control component. **Requires authentication.**
+
+**Response:**
+```json
+{
+  "success": true,
+  "component_id": "uuid-string"
+}
+```
+
+**Errors:**
+- `404` if component not found
+- `400` if component is not type `control`
+
+---
+
+### Streams
+
+Get camera stream URLs.
+
+#### `GET /api/streams/{component_id}`
+
+Get the stream URL for a camera component. **Requires authentication.**
+
+**Response:**
+```json
+{
+  "component_id": "uuid-string",
+  "stream_url": "http://homeassistant.local:8123/api/camera_proxy_stream/camera.my_cam?token=..."
+}
+```
+
+**Errors:**
+- `404` if component not found
+- `400` if component is not type `camera`
 
 ---
 
