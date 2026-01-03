@@ -115,6 +115,31 @@ uvicorn printguard.main:app --reload --host 0.0.0.0 --port 8000
 | `CONNECTION_HEALTH_INTERVAL` | `10.0` | Health check interval |
 | `PRINTER_STATUS_INTERVAL` | `10.0` | Status poll interval |
 | `MAX_DETECTION_HISTORY` | `100` | Detection history size |
+| `WEBPUSH_VAPID_KEYS_PATH` | Auto | Path to VAPID keys JSON file |
+
+### Web Push (VAPID)
+
+PrintGuard uses standard Web Push (VAPID) and reads credentials from a single JSON file.
+
+**Docker default behavior:** if the keys file does not exist, PrintGuard auto-generates a keypair on startup and persists it into the data volume at `/app/data/webpush_vapid_keys.json`.
+
+The generated **public key** is logged on startup (frontend needs it to subscribe).
+
+**Optional:** override the path with:
+
+```bash
+WEBPUSH_VAPID_KEYS_PATH=/app/data/webpush_vapid_keys.json
+```
+
+**Keys file format:**
+
+```json
+{
+  "public_key": "...",
+  "private_key": "/app/data/webpush_vapid_private_key.pem",
+  "subject": "mailto:admin@example.com"
+}
+```
 
 ### MediaMTX Configuration
 

@@ -42,6 +42,66 @@ Returns API health status.
   "status": "ok",
   "version": "0.1.0"
 }
+
+---
+
+### Web Push Notifications
+
+PrintGuard supports standard Web Push subscriptions (VAPID).
+
+If a push send returns `410 Gone`, the server deletes that subscription immediately.
+
+#### Payloads
+
+When a majority defect is detected, PrintGuard sends:
+
+```json
+{
+    "type": "printer_defect",
+}
+```
+
+#### `POST /api/push/subscribe`
+
+Register or update a browser/device push subscription.
+
+**Request:**
+```json
+{
+  "identity_id": "uuid-string (optional)",
+  "endpoint": "https://...",
+  "keys": {
+    "p256dh": "...",
+    "auth": "..."
+  },
+  "expiration_time_ms": 0,
+  "user_agent": "optional"
+}
+```
+
+**Response:**
+```json
+{
+  "id": "uuid-string",
+  "identity_id": "uuid-string (optional)",
+  "endpoint": "https://...",
+  "expiration_time_ms": 0,
+  "user_agent": "..."
+}
+```
+
+#### `POST /api/push/unsubscribe`
+
+Remove a subscription by endpoint.
+
+**Request:**
+```json
+{ "endpoint": "https://..." }
+```
+
+**Response:**
+```json
+{ "ok": true }
 ```
 
 ---
@@ -183,6 +243,7 @@ Sent when database records are created, updated, or deleted.
 - `PRINTER_UPDATE`
 - `COMPONENT_UPDATE`
 - `CONNECTION_UPDATE`
+- `PUSH_SUBSCRIPTION_UPDATE`
 
 ```json
 {

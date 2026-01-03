@@ -10,10 +10,14 @@ from .core.config import settings
 from .core.redis_client import init_redis, close_redis, redis_subscriber
 from .core.ml.model import download_model, load_model
 from .core.worker import worker_orchestrator
+from .core.notifications.vapid import ensure_vapid_configured
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Ensure Web Push VAPID keys exist (stored in WEBPUSH_VAPID_KEYS_PATH)
+    ensure_vapid_configured()
+
     # Initialize Redis
     await init_redis()
     

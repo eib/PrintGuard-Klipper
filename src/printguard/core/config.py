@@ -46,6 +46,9 @@ class Settings(BaseSettings):
     REDIS_DB: int = 0
     REDIS_CHANNEL: str = "printguard:events"
 
+    # --- WebPush (VAPID) ---
+    WEBPUSH_VAPID_KEYS_PATH: Path | None = None
+
     # --- Pydantic Configuration ---
     model_config = SettingsConfigDict(
         env_file=".env", 
@@ -66,5 +69,7 @@ class Settings(BaseSettings):
             object.__setattr__(self, "DATABASE_PATH", self.DATA_DIR / "printguard.db")
         if self.DATABASE_URL is None:
             object.__setattr__(self, "DATABASE_URL", f"sqlite+aiosqlite:///{self.DATABASE_PATH}")
+        if self.WEBPUSH_VAPID_KEYS_PATH is None:
+            object.__setattr__(self, "WEBPUSH_VAPID_KEYS_PATH", self.DATA_DIR / "webpush_vapid_keys.json")
 
 settings = Settings()

@@ -23,3 +23,6 @@ huggingface-hub>=0.20.0
 
 # Redis
 redis>=5.0.0
+
+# Web Push notifications (VAPID)
+pywebpush>=2.0.0

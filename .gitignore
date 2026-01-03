@@ -9,6 +9,9 @@ build
 *.pte
 model/
 data/
+src/printguard/data/
+**/webpush_vapid_keys.json
+**/webpush_vapid_private_key.pem
 .vscode/
 .DS_Store
 .*

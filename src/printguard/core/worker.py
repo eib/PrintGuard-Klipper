@@ -14,6 +14,7 @@ from .db.session import get_session_ctx
 from .connections import get_connection_instance
 from .ml.inference import predict
 from .ml.model import load_model
+from .notifications.models import PrinterDefectMajorityPushPayload
 
 
 logger = logging.getLogger(__name__)
@@ -151,12 +152,16 @@ class WorkerOrchestrator:
                     confidence=result["confidence"],
                     timestamp=datetime.now(),
                 )
-                # Update state and check majority voting
+                # Update state and check majority voting, disabling detection if majority reached
                 defect_detected = await state_manager.update_printer_state_with_majority(
                     printer_id, inference_result, detection_majority
                 )
                 if defect_detected:
                     logger.info(f"Majority defect detected for printer {printer_id}, disabling detection")
+                    async with get_session_ctx() as services:
+                        await services.push_subscriptions.send_to_all(
+                            PrinterDefectMajorityPushPayload(printer_id=printer_id)
+                        )
             except Exception as e:
                 logger.error(f"Inference failed for printer {printer_id}: {e}", exc_info=True)
 
