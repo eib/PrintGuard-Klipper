@@ -910,6 +910,112 @@ document
 
 const printerModalOverlay = document.getElementById("printerModalOverlay");
 const printerModalClose = document.getElementById("printerModalClose");
+const cameraDetailsBtn = document.getElementById("cameraDetailsBtn");
+const cameraDetailsModalOverlay = document.getElementById(
+  "cameraDetailsModalOverlay",
+);
+const cameraDetailsModalClose = document.getElementById(
+  "cameraDetailsModalClose",
+);
+const cameraDetailsCloseBtn = document.getElementById("cameraDetailsCloseBtn");
+
+function formatDetailTimestamp(ts) {
+  if (!ts) {
+    return "-";
+  }
+  try {
+    return new Date(ts * 1000).toLocaleString();
+  } catch {
+    return "-";
+  }
+}
+
+function setCameraDetailField(fieldId, value) {
+  const field = document.getElementById(fieldId);
+  if (field) {
+    field.textContent =
+      value === null || value === undefined || value === ""
+        ? "-"
+        : String(value);
+  }
+}
+
+async function openCameraDetailsModal() {
+  const selectedCameraUUID = settingsCameraUUID.value;
+  if (!selectedCameraUUID) {
+    alert("Please select a camera first.");
+    return;
+  }
+
+  try {
+    const response = await fetch("/camera/state", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ camera_uuid: selectedCameraUUID }),
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      const errorMessage = data?.detail || data?.error || response.statusText;
+      throw new Error(errorMessage);
+    }
+
+    setCameraDetailField("cameraDetailNickname", data.nickname);
+    setCameraDetailField("cameraDetailSource", data.source);
+    setCameraDetailField("cameraDetailSourceType", data.source_type || "auto");
+    setCameraDetailField("cameraDetailPollInterval", data.poll_interval_ms);
+    setCameraDetailField(
+      "cameraDetailLiveDetection",
+      data.live_detection_running ? "Yes" : "No",
+    );
+    setCameraDetailField("cameraDetailLastResult", data.last_result);
+    setCameraDetailField(
+      "cameraDetailLastTime",
+      formatDetailTimestamp(data.last_time),
+    );
+    setCameraDetailField("cameraDetailSensitivity", data.sensitivity);
+    setCameraDetailField("cameraDetailBrightness", data.brightness);
+    setCameraDetailField("cameraDetailContrast", data.contrast);
+    setCameraDetailField("cameraDetailFocus", data.focus);
+    setCameraDetailField("cameraDetailCountdownTime", data.countdown_time);
+    setCameraDetailField("cameraDetailCountdownAction", data.countdown_action);
+    setCameraDetailField(
+      "cameraDetailMajorityThreshold",
+      data.majority_vote_threshold,
+    );
+    setCameraDetailField(
+      "cameraDetailMajorityWindow",
+      data.majority_vote_window,
+    );
+    setCameraDetailField(
+      "cameraDetailPrinterLink",
+      data.printer_id ? "Linked" : "Not linked",
+    );
+
+    cameraDetailsModalOverlay.style.display = "flex";
+  } catch (error) {
+    console.error("Error loading camera details:", error);
+    alert("Failed to load camera details: " + error.message);
+  }
+}
+
+function closeCameraDetailsModal() {
+  cameraDetailsModalOverlay.style.display = "none";
+}
+
+cameraDetailsBtn?.addEventListener("click", (e) => {
+  e.preventDefault();
+  openCameraDetailsModal();
+});
+
+cameraDetailsModalClose?.addEventListener("click", closeCameraDetailsModal);
+cameraDetailsCloseBtn?.addEventListener("click", closeCameraDetailsModal);
+
+cameraDetailsModalOverlay?.addEventListener("click", (e) => {
+  if (e.target === cameraDetailsModalOverlay) {
+    closeCameraDetailsModal();
+  }
+});
 
 function openPrinterModal() {
   const cameraUUID = settingsCameraUUID.value;

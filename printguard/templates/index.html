@@ -255,6 +255,11 @@
                 Add Camera
               </button>
             </div>
+            <div class="settings-item">
+              <button class="start-stop-btn" id="cameraDetailsBtn">
+                Camera Details
+              </button>
+            </div>
           </form>
         </div>
       </div>
@@ -494,6 +499,89 @@
                 Link Printer
               </button>
             </form>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div
+      class="setup-modal-overlay"
+      id="cameraDetailsModalOverlay"
+      style="display: none"
+    >
+      <div class="setup-modal">
+        <div class="setup-modal-header">
+          <h2 class="setup-modal-title">Camera Details</h2>
+          <button class="setup-modal-close" id="cameraDetailsModalClose">
+            ×
+          </button>
+        </div>
+        <div class="setup-modal-content">
+          <div class="camera-details-grid">
+            <p>
+              <strong>Nickname:</strong>
+              <span id="cameraDetailNickname">-</span>
+            </p>
+            <p>
+              <strong>Source:</strong> <span id="cameraDetailSource">-</span>
+            </p>
+            <p>
+              <strong>Source Type:</strong>
+              <span id="cameraDetailSourceType">-</span>
+            </p>
+            <p>
+              <strong>Poll Interval (ms):</strong>
+              <span id="cameraDetailPollInterval">-</span>
+            </p>
+            <p>
+              <strong>Detection Running:</strong>
+              <span id="cameraDetailLiveDetection">-</span>
+            </p>
+            <p>
+              <strong>Last Result:</strong>
+              <span id="cameraDetailLastResult">-</span>
+            </p>
+            <p>
+              <strong>Last Detection:</strong>
+              <span id="cameraDetailLastTime">-</span>
+            </p>
+            <p>
+              <strong>Sensitivity:</strong>
+              <span id="cameraDetailSensitivity">-</span>
+            </p>
+            <p>
+              <strong>Brightness:</strong>
+              <span id="cameraDetailBrightness">-</span>
+            </p>
+            <p>
+              <strong>Contrast:</strong>
+              <span id="cameraDetailContrast">-</span>
+            </p>
+            <p><strong>Focus:</strong> <span id="cameraDetailFocus">-</span></p>
+            <p>
+              <strong>Countdown Time (s):</strong>
+              <span id="cameraDetailCountdownTime">-</span>
+            </p>
+            <p>
+              <strong>Countdown Action:</strong>
+              <span id="cameraDetailCountdownAction">-</span>
+            </p>
+            <p>
+              <strong>Majority Vote Threshold:</strong>
+              <span id="cameraDetailMajorityThreshold">-</span>
+            </p>
+            <p>
+              <strong>Majority Vote Window:</strong>
+              <span id="cameraDetailMajorityWindow">-</span>
+            </p>
+            <p>
+              <strong>Linked Printer:</strong>
+              <span id="cameraDetailPrinterLink">-</span>
+            </p>
+          </div>
+          <div class="button-group">
+            <button id="cameraDetailsCloseBtn" class="start-stop-btn primary">
+              Close
+            </button>
           </div>
         </div>
       </div>

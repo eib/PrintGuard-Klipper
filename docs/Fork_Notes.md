@@ -233,6 +233,28 @@ Improve reliability and clarity of printer-linking outcomes in the browser UI.
 
 ---
 
+## 11) Camera details read-only modal
+
+### Goal
+
+Provide a quick, non-editable view of camera configuration and runtime status, similar to the printer details popup.
+
+### Changes
+
+- Added a new **Camera Details** action in the settings panel.
+- Added a read-only camera details modal showing source metadata and current settings/state.
+- Wired modal data loading to existing `/camera/state` endpoint for selected camera.
+- Added modal open/close behavior (button, close icon, and click-outside).
+- Added dedicated styles for camera details rows inside the modal.
+
+### Primary files
+
+- `printguard/templates/index.html`
+- `printguard/static/js/index.js`
+- `printguard/static/css/index.css`
+
+---
+
 ## Reconciliation notes for upstream merge/cherry-pick
 
 ### High-impact behavior differences to flag
