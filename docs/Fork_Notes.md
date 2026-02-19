@@ -186,6 +186,36 @@ Make source-based development on a Pi or local machine straightforward.
 
 ---
 
+## 9) Setup wizard UX updates (skip + help)
+
+### Goal
+
+Reduce setup friction for local/self-managed installs while keeping users informed.
+
+### Changes
+
+- Added explicit skip paths in setup flow for:
+  - VAPID setup
+  - SSL setup
+  - Final review step
+- Added contextual help icons with external references for:
+  - VAPID/web push concepts
+  - SSL/TLS setup guidance
+  - Setup documentation
+- Setup progress and summary now treat skipped VAPID/SSL steps as completed states.
+- Added `vapidSkipped` / `sslSkipped` state handling in setup frontend logic.
+- Fixed Cloudflare finish button event binding to match the correct element id.
+- Applied template/style/script formatting normalization in touched setup/index frontend files.
+
+### Primary files
+
+- `printguard/templates/setup.html`
+- `printguard/static/js/setup.js`
+- `printguard/static/css/setup.css`
+- `printguard/templates/index.html`
+
+---
+
 ## Reconciliation notes for upstream merge/cherry-pick
 
 ### High-impact behavior differences to flag
