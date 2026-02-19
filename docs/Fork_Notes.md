@@ -216,6 +216,23 @@ Reduce setup friction for local/self-managed installs while keeping users inform
 
 ---
 
+## 10) Printer-linking UX/error handling hardening
+
+### Goal
+
+Improve reliability and clarity of printer-linking outcomes in the browser UI.
+
+### Changes
+
+- Fixed frontend runtime errors caused by referencing an undefined variable (`camIdx`) during printer link/unlink refresh flows.
+- Improved printer add request handling to surface HTTP error details from non-2xx responses (for example `detail` from 400 responses) instead of showing generic `unknown` failures.
+
+### Primary files
+
+- `printguard/static/js/index.js`
+
+---
+
 ## Reconciliation notes for upstream merge/cherry-pick
 
 ### High-impact behavior differences to flag
