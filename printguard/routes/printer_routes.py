@@ -2,7 +2,9 @@ import logging
 
 from fastapi import APIRouter, HTTPException
 
-from ..models import PrinterConfigRequest, AlertAction
+from ..models import PrinterConfigRequest, AlertAction, SavedConfig
+from ..utils.config import get_config
+from ..utils.printer_services.moonraker import MoonrakerClient
 from ..utils.printer_services.octoprint import OctoPrintClient
 from ..utils.printer_utils import (get_printer_id, remove_printer,
                                    set_printer, suspend_print_job)
@@ -26,11 +28,27 @@ async def add_printer_ep(camera_uuid: str, printer_config: PrinterConfigRequest)
         HTTPException: If printer connection test fails or configuration is invalid.
     """
     try:
-        client = OctoPrintClient(printer_config.base_url, printer_config.api_key)
+        config = get_config() or {}
+        allow_unauthenticated = config.get(SavedConfig.ALLOW_UNAUTHENTICATED_PRINTER_API, False)
+        if (printer_config.printer_type in ("octoprint", "moonraker")
+            and not printer_config.api_key
+            and not allow_unauthenticated):
+            raise HTTPException(
+                status_code=400,
+                detail=("API key is required unless "
+                        "allow_unauthenticated_printer_api is enabled.")
+            )
+
+        if printer_config.printer_type == "moonraker":
+            client = MoonrakerClient(printer_config.base_url, printer_config.api_key)
+        else:
+            client = OctoPrintClient(printer_config.base_url, printer_config.api_key)
         client.get_job_info()
         printer_id = f"{camera_uuid}_{printer_config.name.replace(' ', '_')}"
         await set_printer(camera_uuid, printer_id, printer_config.model_dump())
         return {"success": True, "printer_id": printer_id}
+    except HTTPException:
+        raise
     except Exception as e:
         logging.error("Error adding printer: %s", e)
         raise HTTPException(status_code=500, detail=f"Failed to add printer: {str(e)}")

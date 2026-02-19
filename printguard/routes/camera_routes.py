@@ -32,6 +32,9 @@ async def get_camera_state_ep(request: Request, camera_uuid: str = Body(..., emb
         ) else []
     response = {
         "nickname": camera_state.nickname,
+        "source": camera_state.source,
+        "source_type": camera_state.source_type,
+        "poll_interval_ms": camera_state.poll_interval_ms,
         "start_time": camera_state.start_time,
         "last_result": camera_state.last_result,
         "last_time": camera_state.last_time,
@@ -71,10 +74,25 @@ async def add_camera_ep(request: Request):
     data = await request.json()
     nickname = data.get('nickname')
     source = data.get('source')
+    source_type = data.get('source_type', 'auto')
+    try:
+        poll_interval_ms = int(data.get('poll_interval_ms', 1000))
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="Invalid poll_interval_ms value.")
+    poll_interval_ms = max(100, poll_interval_ms)
     if not nickname or not source:
         raise HTTPException(status_code=400, detail="Missing camera nickname or source.")
-    camera = await add_camera(source=source, nickname=nickname)
-    return {"camera_uuid": camera['camera_uuid'], "nickname": camera['nickname'], "source": camera['source']}
+    camera = await add_camera(source=source,
+                              nickname=nickname,
+                              source_type=source_type,
+                              poll_interval_ms=poll_interval_ms)
+    return {
+        "camera_uuid": camera['camera_uuid'],
+        "nickname": camera['nickname'],
+        "source": camera['source'],
+        "source_type": camera['source_type'],
+        "poll_interval_ms": camera['poll_interval_ms']
+    }
 
 @router.post("/camera/remove")
 async def remove_camera_ep(request: Request):
@@ -134,7 +152,7 @@ def generate_preview_frames(source: str):
             logging.error("Error cleaning up preview stream %s: %s", preview_uuid, cleanup_error)
 
 @router.get('/camera/preview', include_in_schema=False)
-async def camera_preview(source: str):
+async def camera_preview(source: str, source_type: str = 'auto', poll_interval_ms: int = 1000):
     """Stream live camera preview for a specific source without registration.
 
     Args:
@@ -143,5 +161,7 @@ async def camera_preview(source: str):
     Returns:
         StreamingResponse: MJPEG streaming response with camera frames.
     """
+    if source_type == 'snapshot':
+        source = f"snapshot::{poll_interval_ms}::{source}"
     return StreamingResponse(generate_preview_frames(source),
                              media_type='multipart/x-mixed-replace; boundary=frame')

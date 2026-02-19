@@ -108,24 +108,27 @@ class CurrentPayload(BaseModel):
 
 class PrinterType(str, Enum):
     OCTOPRINT = "octoprint"
+    MOONRAKER = "moonraker"
 
 class PrinterConfig(BaseModel):
     name: str
     printer_type: PrinterType
     camera_uuid: str
     base_url: str
-    api_key: str
+    api_key: Optional[str] = None
 
 class PrinterConfigRequest(BaseModel):
     name: str
     printer_type: PrinterType
     camera_uuid: str
     base_url: str
-    api_key: str
+    api_key: Optional[str] = None
 
 class CameraState(BaseModel):
     nickname: str
     source: str
+    source_type: str = "auto"
+    poll_interval_ms: int = 1000
     lock: asyncio.Lock = Field(default_factory=asyncio.Lock, exclude=True)
     current_alert_id: Optional[str] = None
     detection_history: List[tuple] = []
@@ -216,6 +219,10 @@ class SavedConfig(str, Enum):
     VAPID_SUBJECT = "vapid_subject"
     VAPID_PUBLIC_KEY = "vapid_public_key"
     STARTUP_MODE = "startup_mode"
+    LOCAL_ONLY_MODE = "local_only_mode"
+    REQUIRE_SSL_FOR_LOCAL = "require_ssl_for_local"
+    REQUIRE_VAPID_FOR_STARTUP = "require_vapid_for_startup"
+    ALLOW_UNAUTHENTICATED_PRINTER_API = "allow_unauthenticated_printer_api"
     SITE_DOMAIN = "site_domain"
     TUNNEL_PROVIDER = "tunnel_provider"
     CLOUDFLARE_EMAIL = "cloudflare_email"

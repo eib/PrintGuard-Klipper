@@ -18,7 +18,7 @@ class OctoPrintClient:
         headers (dict): HTTP headers including API key for authentication
     """
     
-    def __init__(self, base_url: str, api_key: str):
+    def __init__(self, base_url: str, api_key: str | None = None):
         """
         Initialize the OctoPrint client.
         
@@ -28,9 +28,10 @@ class OctoPrintClient:
         """
         self.base_url = base_url.rstrip("/")
         self.headers = {
-            "X-Api-Key": api_key,
             "Content-Type": "application/json"
         }
+        if api_key:
+            self.headers["X-Api-Key"] = api_key
 
     def get_job_info(self) -> JobInfoResponse:
         """

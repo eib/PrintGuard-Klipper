@@ -74,7 +74,35 @@ docker run \
 ```
 
 ## Initial Configuration
-After installation, you will need to configure PrintGuard. First, visit the setup page at `http://localhost:8000/setup`. The setup page allows users to configure network access to the locally hosted site, including seamless options for exposing it via popular reverse proxies for a streamlined setup. All setups require you to choose to either automatically generate or import self-signed SSL certificates for secure access, alongside VAPID keys which are required for web push notifications.
+PrintGuard now supports a **local-only, zero-setup** default workflow.
+
+- By default, the app starts in **local mode** on `http://localhost:8000`
+- **SSL certificates are optional** for local mode
+- **VAPID keys are optional** for startup
+- The setup wizard is no longer required for basic local operation
+
+If you want to preseed configuration before first start, create a `config.json` in the app data directory:
+
+- Docker: `/data/config.json`
+- Native install: platform data dir (for example `~/Library/Application Support/printguard` on macOS)
+
+Example minimal local-only config:
+
+```json
+{
+  "version": "1.0.0",
+  "startup_mode": "local",
+  "local_only_mode": true,
+  "require_ssl_for_local": false,
+  "require_vapid_for_startup": false,
+  "allow_unauthenticated_printer_api": true,
+  "site_domain": "localhost",
+  "push_subscriptions": [],
+  "camera_states": {}
+}
+```
+
+You can still use `/setup` if you want to configure tunnels, SSL, or push notifications.
 
 > [Cloudflare](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) - A secure way to expose your local web interface to the internet via reverse proxies, providing a reliable and secure connection without needing to open ports on your router. Cloudflare tunnels are free to use and offer a simple setup process however, a domain connected to your Cloudflare account is required. Restricted access to your PrintGuard site can be setup through [Cloudflare Access](https://one.dash.cloudflare.com/), configurable in the setup page. During setup, your API key is used to create a tunnel to your local server and insert a DNS record for the tunnel, allowing you to access your PrintGuard instance via your custom domain or subdomain.
 

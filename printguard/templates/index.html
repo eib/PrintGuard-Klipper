@@ -228,6 +228,7 @@
                             <select id="modalPrinterConnectionType" name="printer_type" required>
                                 <option value="">Select connection type...</option>
                                 <option value="octoprint">OctoPrint</option>
+                                <option value="moonraker">Moonraker</option>
                             </select>
                         </div>
                         <div id="modalOctoprintConfig" style="display:none;">
@@ -240,8 +241,8 @@
                                 <input type="url" id="modalOctoprintUrlInput" name="base_url" required />
                             </div>
                             <div class="form-group">
-                                <label for="modalOctoprintApiKeyInput">API Key</label>
-                                <input type="text" id="modalOctoprintApiKeyInput" name="api_key" required />
+                                <label for="modalOctoprintApiKeyInput">API Key / Token (optional)</label>
+                                <input type="text" id="modalOctoprintApiKeyInput" name="api_key" />
                             </div>
                         </div>
                         <button type="submit" id="modalLinkPrinterSubmit" class="start-stop-btn primary">Link Printer</button>
@@ -259,7 +260,7 @@
             <div class="setup-modal-content">
                 <div id="cameraTypeSelection" class="button-group" style="display: flex; justify-content: center; gap: 10px;">
                     <button id="addSerialCameraButton" class="start-stop-btn">Setup Serial (USB) Camera</button>
-                    <button id="addRtspCameraButton" class="start-stop-btn">Setup RTSP Camera</button>
+                    <button id="addRtspCameraButton" class="start-stop-btn">Setup RTSP / HTTP Camera</button>
                 </div>
                 <form id="addCameraForm" style="display:none;">
                     <div class="form-group">
@@ -280,8 +281,18 @@
                     </div>
                     <div id="rtspCameraSetup" style="display:none;">
                         <div class="form-group">
-                            <label for="rtspUrl">RTSP Stream URL</label>
-                            <input type="url" id="rtspUrl" name="source" placeholder="rtsp://0.0.0.0:554/stream" required />
+                            <label for="rtspUrl">Stream URL (RTSP, MJPEG, or Snapshot URL)</label>
+                            <input type="url" id="rtspUrl" name="source" placeholder="http://0.0.0.0/webcam/?action=stream" required />
+                        </div>
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="useSnapshotMode" style="margin-right: 10px;">
+                                Treat URL as JPEG snapshot endpoint (poll over HTTP)
+                            </label>
+                        </div>
+                        <div class="form-group" id="snapshotIntervalGroup" style="display:none;">
+                            <label for="snapshotPollIntervalMs">Snapshot Poll Interval (ms)</label>
+                            <input type="number" id="snapshotPollIntervalMs" value="1000" min="100" max="10000" step="100" />
                         </div>
                     </div>
                     <div class="form-group">

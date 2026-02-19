@@ -4,6 +4,7 @@ import time
 from typing import Dict, Optional, List, Callable
 import cv2
 import numpy as np
+import requests
 
 from .camera_utils import get_camera_state_sync
 
@@ -11,10 +12,16 @@ from .camera_utils import get_camera_state_sync
 class SharedVideoStream:
     """A shared video stream that allows multiple consumers to access the same camera source."""
 
-    def __init__(self, camera_uuid: str, source: str):
+    def __init__(self,
+                 camera_uuid: str,
+                 source: str,
+                 source_type: str = "auto",
+                 poll_interval_ms: int = 1000):
         # pylint: disable=E1101
         self.camera_uuid = camera_uuid
         self.source = source
+        self.source_type = source_type
+        self.poll_interval_ms = max(100, int(poll_interval_ms))
         self.cap: Optional[cv2.VideoCapture] = None
         self.latest_frame: Optional[np.ndarray] = None
         self.frame_lock = threading.Lock()
@@ -46,7 +53,19 @@ class SharedVideoStream:
         """Main capture loop that runs in a separate thread."""
         # pylint: disable=E1101
         try:
+            if self.source_type == "snapshot":
+                self._snapshot_capture_loop()
+                return
+
             source = self.source
+            if isinstance(source, str) and source.startswith("snapshot::"):
+                _, interval_str, snapshot_url = source.split("::", 2)
+                self.poll_interval_ms = max(100, int(interval_str))
+                self.source = snapshot_url
+                self.source_type = "snapshot"
+                self._snapshot_capture_loop()
+                return
+
             if isinstance(source, str) and source.isdigit():
                 source = int(source)
             self.cap = cv2.VideoCapture(source, cv2.CAP_ANY)
@@ -84,6 +103,42 @@ class SharedVideoStream:
             if self.cap and self.cap.isOpened():
                 self.cap.release()
 
+    def _snapshot_capture_loop(self):
+        """Poll a JPEG snapshot endpoint on a fixed interval."""
+        consecutive_failures = 0
+        max_consecutive_failures = 10
+        while self.is_running:
+            try:
+                response = requests.get(self.source, timeout=10)
+                response.raise_for_status()
+                frame_data = np.frombuffer(response.content, np.uint8)
+                frame = cv2.imdecode(frame_data, cv2.IMREAD_COLOR)
+                if frame is None:
+                    raise ValueError("Snapshot decode returned empty frame")
+
+                with self.frame_lock:
+                    self.latest_frame = frame.copy()
+                    self.last_frame_time = time.time()
+                    self.frame_count += 1
+                consecutive_failures = 0
+            except Exception as e:
+                consecutive_failures += 1
+                logging.warning(
+                    "Snapshot poll failed for camera %s (failure %d/%d): %s",
+                    self.camera_uuid,
+                    consecutive_failures,
+                    max_consecutive_failures,
+                    e,
+                )
+                if consecutive_failures >= max_consecutive_failures:
+                    logging.error(
+                        "Too many snapshot polling failures for camera %s, stopping stream",
+                        self.camera_uuid
+                    )
+                    break
+
+            time.sleep(self.poll_interval_ms / 1000.0)
+
     def get_frame(self) -> Optional[np.ndarray]:
         """Get the latest frame from the shared stream."""
         with self.frame_lock:
@@ -115,11 +170,18 @@ class SharedVideoStreamManager:
         self.streams: Dict[str, SharedVideoStream] = {}
         self.lock = threading.Lock()
 
-    def get_stream(self, camera_uuid: str, source: str) -> SharedVideoStream:
+    def get_stream(self,
+                   camera_uuid: str,
+                   source: str,
+                   source_type: str = "auto",
+                   poll_interval_ms: int = 1000) -> SharedVideoStream:
         """Get or create a shared video stream for a camera."""
         with self.lock:
             if camera_uuid not in self.streams:
-                self.streams[camera_uuid] = SharedVideoStream(camera_uuid, source)
+                self.streams[camera_uuid] = SharedVideoStream(camera_uuid,
+                                                              source,
+                                                              source_type,
+                                                              poll_interval_ms)
             else:
                 existing_stream = self.streams[camera_uuid]
                 if (not existing_stream.is_running
@@ -127,7 +189,10 @@ class SharedVideoStreamManager:
                     or not existing_stream.thread.is_alive()):
                     logging.info("Restarting shared video stream for camera %s", camera_uuid)
                     existing_stream.stop()
-                    self.streams[camera_uuid] = SharedVideoStream(camera_uuid, source)
+                    self.streams[camera_uuid] = SharedVideoStream(camera_uuid,
+                                                                  source,
+                                                                  source_type,
+                                                                  poll_interval_ms)
             stream = self.streams[camera_uuid]
             if not stream.is_running:
                 stream.start()
@@ -167,7 +232,10 @@ def get_shared_camera_frame(camera_uuid: str) -> Optional[np.ndarray]:
         if not camera_state or not camera_state.source:
             return None
         manager = get_shared_stream_manager()
-        stream = manager.get_stream(camera_uuid, camera_state.source)
+        stream = manager.get_stream(camera_uuid,
+                        camera_state.source,
+                        camera_state.source_type,
+                        camera_state.poll_interval_ms)
         max_wait = 50
         wait_count = 0
         while not stream.is_frame_available() and wait_count < max_wait:

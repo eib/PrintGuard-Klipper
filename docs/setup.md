@@ -15,10 +15,10 @@
 PrintGuard can run in two modes:
 
 ### Local Network
-- Runs the FastAPI server on `https://localhost:8000`.
+- Runs the FastAPI server on `http://localhost:8000` by default.
 - No external access required.
 - Recommended for secure LAN-only deployments.
-- Requires SSL certificate and VAPID keys, generated during setup.
+- SSL certificates and VAPID keys are optional for local startup.
 
 ### External Access
 External access allows you to expose PrintGuard outside your local network.
@@ -66,9 +66,14 @@ When you execute `printguard`, the application follows these steps to determine 
 
 1. **Initialize configuration**: `init_config()` creates or loads the JSON config file stored in the application data directory and ensures default values.
 2. **Determine startup mode**: `startup_mode_requirements_met()` inspects `config.json` and keyring entries to select one of these startup modes:
-   - `SETUP`: missing required keys or certificates → launch the setup UI at `http://localhost:8000/setup`.
-   - `LOCAL`: all SSL and VAPID requirements met → start FastAPI with HTTPS on port 8000 using `SSL_CERT_FILE` and the key from keyring.
-   - `TUNNEL`: VAPID keys and tunnel credentials exist → continue to tunnel provider logic.
+   - `LOCAL` (default): starts directly for local usage.
+   - `SETUP`: if explicitly selected.
+   - `TUNNEL`: if tunnel provider requirements are met.
+
+   Local startup behavior is controlled by JSON config flags:
+   - `local_only_mode` (default: `true`)
+   - `require_ssl_for_local` (default: `false`)
+   - `require_vapid_for_startup` (default: `false`)
 3. **Ngrok tunnel** (_if `TUNNEL_PROVIDER` is NGROK_):
    - Calls `setup_ngrok_tunnel()` to forward port 8000 to your custom `SITE_DOMAIN` through the ngrok package.
    - On success, runs Uvicorn normally; on failure, resets `STARTUP_MODE` to `SETUP` and restarts.
@@ -76,6 +81,6 @@ When you execute `printguard`, the application follows these steps to determine 
    - Executes `stop_cloudflare_tunnel()` to clear any previous session.
    - Uses `start_cloudflare_tunnel()` to invoke `cloudflared` on your OS (brew, curl, or winget commands) using the stored tunnel credentials.
    - On failure, resets `STARTUP_MODE` to `SETUP` and restarts.
-5. **Final launch**: Uvicorn serves the app at `0.0.0.0:8000`, secured by HTTPS for LOCAL or routed through the external domain for TUNNEL modes.
+5. **Final launch**: Uvicorn serves the app at `0.0.0.0:8000`. LOCAL mode uses HTTP by default unless `require_ssl_for_local` is enabled.
 
-This logic ensures the server automatically falls back to setup if any required credentials, certificates, or tunnels are missing or fail to start.
+This logic enables zero-setup local operation while still supporting setup/tunnel workflows when needed.

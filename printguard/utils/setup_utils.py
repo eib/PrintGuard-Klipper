@@ -1,4 +1,5 @@
 import logging
+import os
 
 from ..models import SavedConfig, SavedKey, SiteStartupMode
 from .config import SSL_CERT_FILE, get_config, get_key
@@ -54,7 +55,7 @@ def check_ssl_certificates_exist() -> bool:
     return True if (
         get_key(SavedKey.SSL_PRIVATE_KEY)
         and site_domain
-        and SSL_CERT_FILE
+        and os.path.exists(SSL_CERT_FILE)
         ) else False
 
 def check_vapid_keys_exist() -> bool:
@@ -103,14 +104,24 @@ def startup_mode_requirements_met() -> SiteStartupMode:
     Returns:
         SiteStartupMode: The site startup mode if requirements are met, SETUP otherwise.
     """
-    startup_mode = get_config().get(SavedConfig.STARTUP_MODE, None)
+    config = get_config() or {}
+    if config.get(SavedConfig.LOCAL_ONLY_MODE, False):
+        return SiteStartupMode.LOCAL
+
+    startup_mode = config.get(SavedConfig.STARTUP_MODE, SiteStartupMode.LOCAL) or SiteStartupMode.LOCAL
+    require_vapid = config.get(SavedConfig.REQUIRE_VAPID_FOR_STARTUP, False)
+    require_ssl_for_local = config.get(SavedConfig.REQUIRE_SSL_FOR_LOCAL, False)
+
     match startup_mode:
         case SiteStartupMode.SETUP:
             return SiteStartupMode.SETUP
         case SiteStartupMode.LOCAL:
-            if check_ssl_certificates_exist() and check_vapid_keys_exist():
+            ssl_ok = True if not require_ssl_for_local else check_ssl_certificates_exist()
+            vapid_ok = True if not require_vapid else check_vapid_keys_exist()
+            if ssl_ok and vapid_ok:
                 return SiteStartupMode.LOCAL
         case SiteStartupMode.TUNNEL:
-            if check_vapid_keys_exist() and check_tunnel_requirements_met():
+            vapid_ok = True if not require_vapid else check_vapid_keys_exist()
+            if vapid_ok and check_tunnel_requirements_met():
                 return SiteStartupMode.TUNNEL
     return SiteStartupMode.SETUP

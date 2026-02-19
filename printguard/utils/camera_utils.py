@@ -11,7 +11,7 @@ from ..models import CameraState
 from .camera_state_manager import get_camera_state_manager
 
 
-async def add_camera(source, nickname):
+async def add_camera(source, nickname, source_type="auto", poll_interval_ms=1000):
     """
     Adds a new camera, assigns a UUID, and stores it.
 
@@ -27,9 +27,17 @@ async def add_camera(source, nickname):
     new_camera_state = CameraState(
         nickname=nickname,
         source=source,
+        source_type=source_type,
+        poll_interval_ms=poll_interval_ms,
     )
     await manager.update_camera_state(camera_uuid, new_camera_state.model_dump())
-    return {"camera_uuid": camera_uuid, "nickname": nickname, "source": source}
+    return {
+        "camera_uuid": camera_uuid,
+        "nickname": nickname,
+        "source": source,
+        "source_type": source_type,
+        "poll_interval_ms": poll_interval_ms,
+    }
 
 async def remove_camera(camera_uuid: str) -> bool:
     """

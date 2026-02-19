@@ -7,6 +7,7 @@ from ..models import PollingTask, SavedConfig, AlertAction
 from .camera_utils import get_camera_state_sync, update_camera_state
 from .config import PRINTER_STAT_POLLING_RATE_MS, get_config
 from .printer_services.octoprint import OctoPrintClient
+from .printer_services.moonraker import MoonrakerClient
 from .sse_utils import add_polling_task, sse_update_printer_state
 
 def get_printer_config(camera_uuid):
@@ -108,10 +109,17 @@ async def start_printer_state_polling(camera_uuid):
     printer_polling_rate = float(config.get(
         SavedConfig.PRINTER_STAT_POLLING_RATE_MS, PRINTER_STAT_POLLING_RATE_MS
         ) / 1000)
-    client = OctoPrintClient(
-        camera_printer_config.get('base_url'),
-        camera_printer_config.get('api_key')
-    )
+    printer_type = camera_printer_config.get('printer_type')
+    if printer_type == 'moonraker':
+        client = MoonrakerClient(
+            camera_printer_config.get('base_url'),
+            camera_printer_config.get('api_key')
+        )
+    else:
+        client = OctoPrintClient(
+            camera_printer_config.get('base_url'),
+            camera_printer_config.get('api_key')
+        )
     task = asyncio.create_task(poll_printer_state_func(client, printer_polling_rate, stop_event))
     add_polling_task(camera_uuid, PollingTask(task=task, stop_event=stop_event))
     logging.debug("Started printer state polling for camera UUID %s", camera_uuid)
@@ -131,30 +139,40 @@ def suspend_print_job(camera_uuid, action: AlertAction):
         if printer_config['printer_type'] == 'octoprint':
             client = OctoPrintClient(
                 printer_config['base_url'],
-                printer_config['api_key']
+                printer_config.get('api_key')
             )
-            try:
-                job_info = client.get_job_info()
-                if job_info.state != "Printing":
+        elif printer_config['printer_type'] == 'moonraker':
+            client = MoonrakerClient(
+                printer_config['base_url'],
+                printer_config.get('api_key')
+            )
+        else:
+            logging.error("Unsupported printer type %s for camera UUID %s",
+                          printer_config.get('printer_type'), camera_uuid)
+            return False
+
+        try:
+            job_info = client.get_job_info()
+            if job_info.state != "Printing":
+                return True
+            match action:
+                case AlertAction.CANCEL_PRINT:
+                    client.cancel_job()
+                    logging.debug("Print cancelled for printer %s on camera %s",
+                                    printer_config['name'], camera_uuid)
                     return True
-                match action:
-                    case AlertAction.CANCEL_PRINT:
-                        client.cancel_job()
-                        logging.debug("Print cancelled for printer %s on camera %s",
-                                        printer_config['name'], camera_uuid)
-                        return True
-                    case AlertAction.PAUSE_PRINT:
-                        client.pause_job()
-                        logging.debug("Print paused for printer %s on camera %s",
-                                        printer_config['name'], camera_uuid)
-                        return True
-                    case _:
-                        logging.debug("No action taken for printer %s on camera %s as %s",
-                                        printer_config['name'], camera_uuid, action)
-                        return True
-            except Exception as e:
-                logging.error("Error suspending print job for printer %s on camera %s: %s",
-                                printer_config['name'], camera_uuid, e)
-                return False
+                case AlertAction.PAUSE_PRINT:
+                    client.pause_job()
+                    logging.debug("Print paused for printer %s on camera %s",
+                                    printer_config['name'], camera_uuid)
+                    return True
+                case _:
+                    logging.debug("No action taken for printer %s on camera %s as %s",
+                                    printer_config['name'], camera_uuid, action)
+                    return True
+        except Exception as e:
+            logging.error("Error suspending print job for printer %s on camera %s: %s",
+                            printer_config['name'], camera_uuid, e)
+            return False
     logging.error("No printer configuration found for camera UUID %s", camera_uuid)
     return False

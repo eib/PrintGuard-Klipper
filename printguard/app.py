@@ -131,7 +131,15 @@ async def http_redirect_middleware(request: Request, call_next):
     Middleware to handle HTTP requests - redirect to setup page unless accessing setup routes.
     Only allows setup routes and static files when using HTTP.
     """
-    if request.url.scheme == "http":
+    config = get_config() or {}
+    local_only_mode = config.get(SavedConfig.LOCAL_ONLY_MODE, False)
+    require_ssl_for_local = config.get(SavedConfig.REQUIRE_SSL_FOR_LOCAL, False)
+    startup_mode = config.get(SavedConfig.STARTUP_MODE, SiteStartupMode.LOCAL) or SiteStartupMode.LOCAL
+    allow_plain_http = local_only_mode or (
+        startup_mode == SiteStartupMode.LOCAL and not require_ssl_for_local
+    )
+
+    if request.url.scheme == "http" and not allow_plain_http:
         if (request.url.path.startswith("/setup") or
             request.url.path.startswith("/static")):
             response = await call_next(request)
@@ -161,12 +169,16 @@ def run():
             uvicorn.run(app, host="0.0.0.0", port=8000)
         case SiteStartupMode.LOCAL:
             logging.warning("Starting in local mode. Available at %s", site_domain)
-            ssl_private_key_path = get_ssl_private_key_temporary_path()
-            uvicorn.run(app,
-                        host="0.0.0.0",
-                        port=8000,
-                        ssl_certfile=SSL_CERT_FILE,
-                        ssl_keyfile=ssl_private_key_path)
+            require_ssl_for_local = app_config.get(SavedConfig.REQUIRE_SSL_FOR_LOCAL, False)
+            if require_ssl_for_local:
+                ssl_private_key_path = get_ssl_private_key_temporary_path()
+                uvicorn.run(app,
+                            host="0.0.0.0",
+                            port=8000,
+                            ssl_certfile=SSL_CERT_FILE,
+                            ssl_keyfile=ssl_private_key_path)
+            else:
+                uvicorn.run(app, host="0.0.0.0", port=8000)
         case SiteStartupMode.TUNNEL:
             match tunnel_provider:
                 case TunnelProvider.NGROK:

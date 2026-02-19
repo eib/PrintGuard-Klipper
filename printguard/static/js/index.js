@@ -916,7 +916,9 @@ document.getElementById('modalUnlinkPrinterBtn').addEventListener('click', () =>
 });
 
 document.getElementById('modalPrinterConnectionType').addEventListener('change', (e) => {
-    document.getElementById('modalOctoprintConfig').style.display = e.target.value === 'octoprint' ? 'block' : 'none';
+    const selectedType = e.target.value;
+    document.getElementById('modalOctoprintConfig').style.display =
+        (selectedType === 'octoprint' || selectedType === 'moonraker') ? 'block' : 'none';
 });
 
 document.getElementById('linkPrinterForm')?.addEventListener('submit', async (e) => {
@@ -936,13 +938,9 @@ document.getElementById('linkPrinterForm')?.addEventListener('submit', async (e)
         alert('Please enter a printer name');
         return;
     }
-    if (printerType === 'octoprint') {
+    if (printerType === 'octoprint' || printerType === 'moonraker') {
         if (!baseUrl) {
             alert('Please enter the base URL');
-            return;
-        }
-        if (!apiKey) {
-            alert('Please enter the API key');
             return;
         }
     }
@@ -1009,6 +1007,9 @@ const serialCameraSetup = document.getElementById('serialCameraSetup');
 const rtspCameraSetup = document.getElementById('rtspCameraSetup');
 const serialDeviceSelect = document.getElementById('serialDevice');
 const rtspUrlInput = document.getElementById('rtspUrl');
+const useSnapshotModeInput = document.getElementById('useSnapshotMode');
+const snapshotIntervalGroup = document.getElementById('snapshotIntervalGroup');
+const snapshotPollIntervalInput = document.getElementById('snapshotPollIntervalMs');
 const serialLoading = document.getElementById('serialLoading');
 const noSerialDeviceMessage = document.getElementById('noSerialDeviceMessage');
 
@@ -1064,7 +1065,11 @@ function updatePreview() {
         return;
     }
     showPreviewLoading();
-    const previewUrl = `/camera/preview?source=${encodeURIComponent(source)}`;
+    const sourceType = useSnapshotModeInput?.checked ? 'snapshot' : 'auto';
+    const pollIntervalMs = useSnapshotModeInput?.checked
+        ? (parseInt(snapshotPollIntervalInput?.value || '1000', 10) || 1000)
+        : 1000;
+    const previewUrl = `/camera/preview?source=${encodeURIComponent(source)}&source_type=${encodeURIComponent(sourceType)}&poll_interval_ms=${pollIntervalMs}`;
     const img = new Image();
     img.onload = function() {
         showPreviewImage(previewUrl);
@@ -1135,6 +1140,12 @@ addRtspCameraButton?.addEventListener('click', () => {
     rtspCameraSetup.style.display = 'block';
     serialDeviceSelect.required = false;
     rtspUrlInput.required = true;
+    if (useSnapshotModeInput) {
+        useSnapshotModeInput.checked = false;
+    }
+    if (snapshotIntervalGroup) {
+        snapshotIntervalGroup.style.display = 'none';
+    }
 });
 
 enablePreview?.addEventListener('change', updatePreview);
@@ -1151,6 +1162,21 @@ rtspUrlInput?.addEventListener('input', () => {
     }
 });
 
+useSnapshotModeInput?.addEventListener('change', () => {
+    if (snapshotIntervalGroup) {
+        snapshotIntervalGroup.style.display = useSnapshotModeInput.checked ? 'block' : 'none';
+    }
+    if (enablePreview.checked) {
+        schedulePreviewUpdate();
+    }
+});
+
+snapshotPollIntervalInput?.addEventListener('input', () => {
+    if (enablePreview.checked && useSnapshotModeInput?.checked) {
+        schedulePreviewUpdate();
+    }
+});
+
 addCameraForm?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const formData = new FormData(addCameraForm);
@@ -1160,6 +1186,13 @@ addCameraForm?.addEventListener('submit', async (e) => {
             data[key] = value;
         }
     });
+
+    if (rtspCameraSetup.style.display !== 'none') {
+        data.source_type = useSnapshotModeInput?.checked ? 'snapshot' : 'auto';
+        data.poll_interval_ms = useSnapshotModeInput?.checked
+            ? (parseInt(snapshotPollIntervalInput?.value || '1000', 10) || 1000)
+            : 1000;
+    }
 
     try {
         const response = await fetch('/camera/add', {
@@ -1200,6 +1233,15 @@ addCameraModalClose?.addEventListener('click', function() {
     noSerialDeviceMessage.style.display = 'none';
     serialLoading.style.display = 'none';
     enablePreview.checked = false;
+    if (useSnapshotModeInput) {
+        useSnapshotModeInput.checked = false;
+    }
+    if (snapshotIntervalGroup) {
+        snapshotIntervalGroup.style.display = 'none';
+    }
+    if (snapshotPollIntervalInput) {
+        snapshotPollIntervalInput.value = '1000';
+    }
     hidePreview();
     if (previewUpdateTimeout) {
         clearTimeout(previewUpdateTimeout);

@@ -261,10 +261,10 @@
 ```json
 {
     "name": "string",
-    "printer_type": "octoprint",
+    "printer_type": "octoprint | moonraker",
     "camera_uuid": "string",
     "base_url": "string",
-    "api_key": "string"
+    "api_key": "string (optional when allow_unauthenticated_printer_api=true)"
 }
 ```
 **Response:**
