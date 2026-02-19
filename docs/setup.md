@@ -74,6 +74,7 @@ When you execute `printguard`, the application follows these steps to determine 
    - `local_only_mode` (default: `true`)
    - `require_ssl_for_local` (default: `false`)
    - `require_vapid_for_startup` (default: `false`)
+   - `http_port` (default: `8000`)
 3. **Ngrok tunnel** (_if `TUNNEL_PROVIDER` is NGROK_):
    - Calls `setup_ngrok_tunnel()` to forward port 8000 to your custom `SITE_DOMAIN` through the ngrok package.
    - On success, runs Uvicorn normally; on failure, resets `STARTUP_MODE` to `SETUP` and restarts.

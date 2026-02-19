@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional
 import requests
 
 from ..models import OperatingSystem, SavedConfig, SavedKey
-from ..utils.config import get_config
+from ..utils.config import get_config, DEFAULT_HTTP_PORT, get_http_port
 
 
 class CloudflareAPI:
@@ -194,7 +194,7 @@ class CloudflareOSCommands:
 
     @staticmethod
     def get_start_command(os: OperatingSystem, tunnel_name: str = "",
-                          token: str = "", local_port: int = 8000) -> str:
+                          token: str = "", local_port: int = DEFAULT_HTTP_PORT) -> str:
         """Get the command to start a cloudflared tunnel.
 
         Args:
@@ -236,7 +236,7 @@ class CloudflareOSCommands:
 
     @staticmethod
     def get_restart_command(os: OperatingSystem, tunnel_name: str = "",
-                            token: str = "", local_port: int = 8000) -> str:
+                            token: str = "", local_port: int = DEFAULT_HTTP_PORT) -> str:
         """Get the command to restart cloudflared tunnels.
 
         Args:
@@ -255,7 +255,7 @@ class CloudflareOSCommands:
 
     @staticmethod
     def get_all_commands(os: OperatingSystem, tunnel_name: str,
-                         token: str, local_port: int = 8000) -> Dict[str, str]:
+                         token: str, local_port: int = DEFAULT_HTTP_PORT) -> Dict[str, str]:
         """Get all cloudflared commands for the specified OS.
 
         Args:
@@ -288,7 +288,9 @@ class CloudflareOSCommands:
         }
 
     @staticmethod
-    def get_setup_sequence(os: OperatingSystem, token: str, local_port: int = 8000) -> List[str]:
+    def get_setup_sequence(os: OperatingSystem,
+                           token: str,
+                           local_port: int = DEFAULT_HTTP_PORT) -> List[str]:
         """Get the sequence of commands to set up and start a tunnel.
 
         Args:
@@ -306,7 +308,10 @@ class CloudflareOSCommands:
         seq.append(CloudflareOSCommands.get_start_command(os, "", token, local_port))
         return seq
 
-def get_cloudflare_commands(os: OperatingSystem, tunnel_name: str, token: str, local_port: int = 8000) -> Dict[str, str]:
+def get_cloudflare_commands(os: OperatingSystem,
+                            tunnel_name: str,
+                            token: str,
+                            local_port: int = DEFAULT_HTTP_PORT) -> Dict[str, str]:
     """Get all cloudflared commands for the specified OS and configuration.
 
     Args:
@@ -321,7 +326,7 @@ def get_cloudflare_commands(os: OperatingSystem, tunnel_name: str, token: str, l
     return CloudflareOSCommands.get_all_commands(os, tunnel_name, token, local_port)
 
 def get_cloudflare_setup_sequence(os: OperatingSystem, token: str,
-                                  local_port: int = 8000) -> List[str]:
+                                  local_port: int = DEFAULT_HTTP_PORT) -> List[str]:
     """Get the setup sequence for cloudflared on the specified OS.
 
     Args:
@@ -396,7 +401,12 @@ def start_cloudflare_tunnel() -> bool:
         tunnel_token = get_key(SavedKey.TUNNEL_TOKEN)
         if not tunnel_token:
             raise ValueError("Tunnel token not found. Please complete tunnel setup first.")
-        start_command = CloudflareOSCommands.get_start_command(current_os, "", tunnel_token, 8000)
+        start_command = CloudflareOSCommands.get_start_command(
+            current_os,
+            "",
+            tunnel_token,
+            get_http_port(get_config() or {})
+        )
         logging.debug("Starting Cloudflare tunnel with command: %s", start_command)
         result = subprocess.run(start_command, shell=True,
                              capture_output=True, text=True,

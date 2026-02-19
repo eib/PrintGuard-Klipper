@@ -22,7 +22,8 @@ from .utils.config import (get_ssl_private_key_temporary_path,
                            SSL_CERT_FILE, get_prototypes_dir,
                            get_model_path, get_model_options_path,
                            DEVICE_TYPE, SUCCESS_LABEL,
-                           get_config, update_config, init_config)
+                           get_config, update_config, init_config,
+                           get_http_port)
 from .utils.inference_lib import get_inference_engine
 from .utils.cloudflare_utils import (start_cloudflare_tunnel, stop_cloudflare_tunnel)
 
@@ -161,12 +162,13 @@ def run():
     startup_mode = startup_mode_requirements_met()
     app_config = get_config()
     site_domain = app_config.get(SavedConfig.SITE_DOMAIN, "")
+    http_port = get_http_port(app_config)
     tunnel_provider = app_config.get(SavedConfig.TUNNEL_PROVIDER, None)
     stop_cloudflare_tunnel()
     match startup_mode:
         case SiteStartupMode.SETUP:
-            logging.warning("Starting in setup mode. Available at http://localhost:8000/setup")
-            uvicorn.run(app, host="0.0.0.0", port=8000)
+            logging.warning("Starting in setup mode. Available at http://localhost:%s/setup", http_port)
+            uvicorn.run(app, host="0.0.0.0", port=http_port)
         case SiteStartupMode.LOCAL:
             logging.warning("Starting in local mode. Available at %s", site_domain)
             require_ssl_for_local = app_config.get(SavedConfig.REQUIRE_SSL_FOR_LOCAL, False)
@@ -174,11 +176,11 @@ def run():
                 ssl_private_key_path = get_ssl_private_key_temporary_path()
                 uvicorn.run(app,
                             host="0.0.0.0",
-                            port=8000,
+                            port=http_port,
                             ssl_certfile=SSL_CERT_FILE,
                             ssl_keyfile=ssl_private_key_path)
             else:
-                uvicorn.run(app, host="0.0.0.0", port=8000)
+                uvicorn.run(app, host="0.0.0.0", port=http_port)
         case SiteStartupMode.TUNNEL:
             match tunnel_provider:
                 case TunnelProvider.NGROK:
@@ -191,12 +193,12 @@ def run():
                         update_config({SavedConfig.STARTUP_MODE: SiteStartupMode.SETUP})
                         run()
                     else:
-                        uvicorn.run(app, host="0.0.0.0", port=8000)
+                        uvicorn.run(app, host="0.0.0.0", port=http_port)
                 case TunnelProvider.CLOUDFLARE:
                     logging.warning("Starting in tunnel mode with Cloudflare.")
                     if start_cloudflare_tunnel():
                         logging.warning("Cloudflare tunnel started. Available at %s", site_domain)
-                        uvicorn.run(app, host="0.0.0.0", port=8000)
+                        uvicorn.run(app, host="0.0.0.0", port=http_port)
                     else:
                         logging.error("Failed to start Cloudflare tunnel. Starting in SETUP mode.")
                         update_config({SavedConfig.STARTUP_MODE: SiteStartupMode.SETUP})

@@ -21,6 +21,7 @@ PrintGuard offers local, **real-time print failure detection** for **3D printing
     - [PyPI Installation](#pypi-installation)
     - [Docker Installation](#docker-installation)
 - [Initial Configuration](#initial-configuration)
+- [Local Development](#local-development)
 - [Usage](#usage)
 - [Technical Documentation](/docs/overview.md)
 
@@ -96,6 +97,7 @@ Example minimal local-only config:
   "require_ssl_for_local": false,
   "require_vapid_for_startup": false,
   "allow_unauthenticated_printer_api": true,
+  "http_port": 8000,
   "site_domain": "localhost",
   "push_subscriptions": [],
   "camera_states": {}
@@ -103,6 +105,9 @@ Example minimal local-only config:
 ```
 
 You can still use `/setup` if you want to configure tunnels, SSL, or push notifications.
+
+## Local Development
+For running from a git clone (including Raspberry Pi workflows), see [docs/development.md](docs/development.md).
 
 > [Cloudflare](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) - A secure way to expose your local web interface to the internet via reverse proxies, providing a reliable and secure connection without needing to open ports on your router. Cloudflare tunnels are free to use and offer a simple setup process however, a domain connected to your Cloudflare account is required. Restricted access to your PrintGuard site can be setup through [Cloudflare Access](https://one.dash.cloudflare.com/), configurable in the setup page. During setup, your API key is used to create a tunnel to your local server and insert a DNS record for the tunnel, allowing you to access your PrintGuard instance via your custom domain or subdomain.
 

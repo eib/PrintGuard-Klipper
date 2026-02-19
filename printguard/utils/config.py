@@ -19,6 +19,26 @@ from ..models import AlertAction, SavedKey, SavedConfig
 
 # Config version - increment this when the config structure changes
 CONFIG_VERSION = "1.0.0"
+DEFAULT_HTTP_PORT = 8000
+
+def get_http_port(config: dict | None = None) -> int:
+    """Get the configured HTTP port with validation and fallback.
+
+    Args:
+        config (dict | None): Optional config dictionary. If omitted, it will be loaded.
+
+    Returns:
+        int: A valid TCP port number, or DEFAULT_HTTP_PORT if invalid/missing.
+    """
+    cfg = config if config is not None else (get_config() or {})
+    raw_port = cfg.get(SavedConfig.HTTP_PORT, DEFAULT_HTTP_PORT)
+    try:
+        port = int(raw_port)
+        if 1 <= port <= 65535:
+            return port
+    except (TypeError, ValueError):
+        pass
+    return DEFAULT_HTTP_PORT
 
 def is_running_in_docker():
     """Check if the application is running inside a Docker container."""
@@ -155,6 +175,7 @@ def init_config():
                 SavedConfig.REQUIRE_SSL_FOR_LOCAL: False,
                 SavedConfig.REQUIRE_VAPID_FOR_STARTUP: False,
                 SavedConfig.ALLOW_UNAUTHENTICATED_PRINTER_API: True,
+                SavedConfig.HTTP_PORT: DEFAULT_HTTP_PORT,
                 SavedConfig.SITE_DOMAIN: "localhost",
                 SavedConfig.TUNNEL_PROVIDER: None,
                 SavedConfig.PUSH_SUBSCRIPTIONS: [],
@@ -308,6 +329,7 @@ def reset_config():
             SavedConfig.REQUIRE_SSL_FOR_LOCAL: False,
             SavedConfig.REQUIRE_VAPID_FOR_STARTUP: False,
             SavedConfig.ALLOW_UNAUTHENTICATED_PRINTER_API: True,
+            SavedConfig.HTTP_PORT: DEFAULT_HTTP_PORT,
             SavedConfig.SITE_DOMAIN: "localhost",
             SavedConfig.TUNNEL_PROVIDER: None,
             SavedConfig.PUSH_SUBSCRIPTIONS: [],

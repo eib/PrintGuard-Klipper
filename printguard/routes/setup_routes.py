@@ -12,7 +12,8 @@ from ..models import (TunnelProvider, TunnelSettings, SavedConfig,
                       VapidSettings, SavedKey, SetupCompletion,
                       CloudflareTunnelConfig, CloudflareDownloadConfig)
 from ..utils.config import (SSL_CA_FILE, SSL_CERT_FILE,
-                            store_key, get_config, update_config, get_key)
+                            store_key, get_config, update_config, get_key,
+                            get_http_port)
 from ..utils.setup_utils import setup_ngrok_tunnel
 from ..utils.cloudflare_utils import CloudflareAPI, get_cloudflare_setup_sequence
 
@@ -373,7 +374,7 @@ async def save_cloudflare_os(config: CloudflareDownloadConfig):
         setup_commands = get_cloudflare_setup_sequence(
             config.operating_system,
             processed_tunnel_token,
-            8000
+            get_http_port(cf_config)
         )
         return {
             "success": True,

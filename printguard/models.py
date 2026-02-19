@@ -223,6 +223,7 @@ class SavedConfig(str, Enum):
     REQUIRE_SSL_FOR_LOCAL = "require_ssl_for_local"
     REQUIRE_VAPID_FOR_STARTUP = "require_vapid_for_startup"
     ALLOW_UNAUTHENTICATED_PRINTER_API = "allow_unauthenticated_printer_api"
+    HTTP_PORT = "http_port"
     SITE_DOMAIN = "site_domain"
     TUNNEL_PROVIDER = "tunnel_provider"
     CLOUDFLARE_EMAIL = "cloudflare_email"

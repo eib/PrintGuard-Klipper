@@ -2,12 +2,12 @@ import logging
 import os
 
 from ..models import SavedConfig, SavedKey, SiteStartupMode
-from .config import SSL_CERT_FILE, get_config, get_key
+from .config import SSL_CERT_FILE, get_config, get_key, get_http_port
 
 
 def setup_ngrok_tunnel(close: bool = False) -> bool:
     """
-    Start a ngrok tunnel at port 8000 using the provided auth key and domain.
+    Start a ngrok tunnel at the configured HTTP port using the provided auth key and domain.
     Requirements:
         - TUNNEL_API_KEY must be set.
         - SITE_DOMAIN must be set.
@@ -19,6 +19,7 @@ def setup_ngrok_tunnel(close: bool = False) -> bool:
         bool: True if the tunnel was successfully started, False otherwise.
     """
     config = get_config()
+    http_port = get_http_port(config)
     tunnel_auth_key = get_key(SavedKey.TUNNEL_API_KEY)
     tunnel_domain = config.get(SavedConfig.SITE_DOMAIN, None)
     if not tunnel_auth_key and not tunnel_domain:
@@ -27,7 +28,7 @@ def setup_ngrok_tunnel(close: bool = False) -> bool:
         # pylint: disable=import-outside-toplevel
         import ngrok
         # pylint: disable=E1101
-        listener = ngrok.forward(8000, authtoken=tunnel_auth_key, domain=tunnel_domain)
+        listener = ngrok.forward(http_port, authtoken=tunnel_auth_key, domain=tunnel_domain)
         if listener:
             if close:
                 ngrok.disconnect()
